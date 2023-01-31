@@ -66,9 +66,10 @@ class Prayers:
                     e.title = f"Waktu {pray} untuk area {ModularBotConst.__PRAYER_LOCATION} dan sekitarnya"
                     e.description = f"Waktunya salat {pray}, salat yang khusyuk, biar bisa ketemu waifu di isekaid.\n\n " \
                         f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal shalat hari ini:**"
-        if not e:
-            for key, value in praytimes:
-                e.add_field(name=f"{key}:", value=value)
+        if e is not None:
+            for key, value in praytimes.items():
+                if value != "ramadhan":
+                    e.add_field(name=f"{key}:", value=value)
             e.set_author(name="Muslim Pro",
                 icon_url="https://i.imgur.com/T7Zqnzw.png")
         return e

@@ -2,7 +2,6 @@ version: "3.9"
 
 services:
   lavalink:
-    container_name: lavalink
     image: fredboat/lavalink:master
     environment:
       SERVER_PORT: 2333
@@ -26,9 +25,11 @@ services:
       LAVALINK_SERVER_YOUTUBE_CONFIG_PASSWORD: ${YOUTUBE_PASSWORD}
     volumes:
       - ./Lavalink/application.yml:/opt/Lavalink/application.yml
-    restart: always
+    restart: on-failure
+    ports:
+      - '2333:2333'
     env_file:
-      - .env_lavalink
+      - .env
 
   bot:
     build:
