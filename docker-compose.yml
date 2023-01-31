@@ -26,8 +26,6 @@ services:
     volumes:
       - ./Lavalink/application.yml:/opt/Lavalink/application.yml
     restart: on-failure
-    ports:
-      - '2333:2333'
     env_file:
       - .env
 
