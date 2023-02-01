@@ -18,8 +18,8 @@ from const import Expression, GuildRole, ModularBotConst
 
 async def setup(bot: commands.Bot) -> None:
     await wait([
-        bot.add_cog(Administrator(bot=bot)),
-        bot.add_cog(Multimedia(bot=bot))
+        ensure_future(bot.add_cog(Administrator(bot=bot))),
+        ensure_future(bot.add_cog(Multimedia(bot=bot)))
     ])
 
     print("Cog loaded")

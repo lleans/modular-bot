@@ -129,11 +129,11 @@ class ModularBotBase:
         channel_channel_edit: VoiceChannel = self.get_channel(GuildChannel.CHANNEL_ANLYTICS)
         role_channel_edit: VoiceChannel = self.get_channel(GuildChannel.ROLE_ANLYTICS)
 
-        return await wait([member_channel_edit.edit(name=f"Jumlah Member: {member_count}"),
-            user_channel_edit.edit(name=f"Jumlah User: {the_musketter_count}"),
-            bot_channel_edit.edit(name=f"Jumlah BOT: {bot_count}"),
-            channel_channel_edit.edit(name=f"Jumlah Channel: {channel_count}"),
-            role_channel_edit.edit(name=f"Jumlah Role: {role_count}")
+        return await wait([ensure_future(member_channel_edit.edit(name=f"Jumlah Member: {member_count}")),
+            ensure_future(user_channel_edit.edit(name=f"Jumlah User: {the_musketter_count}")),
+            ensure_future(bot_channel_edit.edit(name=f"Jumlah BOT: {bot_count}")),
+            ensure_future(channel_channel_edit.edit(name=f"Jumlah Channel: {channel_count}")),
+            ensure_future(role_channel_edit.edit(name=f"Jumlah Role: {role_count}"))
         ])
 
 
