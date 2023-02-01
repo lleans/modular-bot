@@ -158,7 +158,7 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
             return
 
         await self.anlytics()
-        welcome_banner: BytesIO = await ModularUtil.banner_creator(member.name, member.avatar.url)
+        welcome_banner: BytesIO = await ModularUtil.banner_creator(f"{member.name}#{member.discriminator}", member.avatar.url)
 
         welcome_channel: TextChannel = self.get_channel(GuildChannel.WELCOME_CHANNEL)
         image_file: File = File(BytesIO(welcome_banner.getbuffer()), filename='image.png')
@@ -171,7 +171,7 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
     async def on_member_remove(self, member: Member) -> None:
         await self.anlytics()
-        leave_banner: BytesIO = await ModularUtil.banner_creator(member.name, member.avatar.url, is_welcome=False)
+        leave_banner: BytesIO = await ModularUtil.banner_creator(f"{member.name}#{member.discriminator}", member.avatar.url, is_welcome=False)
 
         leave_channel: TextChannel = self.get_channel(GuildChannel.GOODBYE_CHANNEL)
         image_file: File = File(BytesIO(leave_banner.getbuffer()), filename='image.png')
