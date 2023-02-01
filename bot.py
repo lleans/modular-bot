@@ -46,7 +46,7 @@ class ModularBotTask:
         await bot.wait_until_ready()
         await NodePool.create_node(
             bot=bot,
-            host='localhost',
+            host='lavalink',
             port=2333,
             password='youshallnotpass',
             region="singapore"
