@@ -37,7 +37,7 @@ class Prayers:
                 resp: dict = await resp.json()
                 time: datetime = ModularUtil.get_time()
                 res: dict = {}
-                res.update(resp['praytimes'][time.strftime('%a %d %b')])
+                res.update(resp['praytimes'][f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"])
                 res.update({
                     'ramadhan': resp['ramadhan'][time.strftime('%Y')]
                 })
