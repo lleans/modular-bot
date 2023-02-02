@@ -154,7 +154,7 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
         print(f"Node {node.host}, {node._heartbeat}, {node.region} is ready!")
 
     async def on_member_join(self, member: Member) -> None:
-        if member.guild.id != self.get_guild(self._guild):
+        if member.guild.id != self._guild.id:
             return
 
         await self.anlytics()
