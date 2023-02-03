@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import List
 from itertools import islice
 
-from discord import app_commands, Interaction, VoiceClient, Embed, Message, TextChannel, Guild
+from discord import app_commands, Interaction, VoiceClient, Embed, Message, TextChannel, Guild, Member
 from discord.ext import commands, tasks
 from wavelink.player import Player
 from wavelink.tracks import YouTubePlaylist, YouTubeTrack, Track
@@ -19,7 +19,8 @@ from const import Expression, GuildRole, ModularBotConst
 async def setup(bot: commands.Bot) -> None:
     await wait([
         ensure_future(bot.add_cog(Administrator(bot=bot))),
-        ensure_future(bot.add_cog(Multimedia(bot=bot)))
+        ensure_future(bot.add_cog(Multimedia(bot=bot))),
+        ensure_future(bot.add_cog(Playground(bot=bot)))
     ])
 
     print("Cog loaded")
@@ -53,6 +54,23 @@ class Administrator(commands.Cog):
             await _handling_error(interaction=interaction, resp=f'❌ Uknown error, {Exception(error)}')
 
         return await super().cog_app_command_error(interaction, error)
+
+class Playground(commands.Cog):
+
+    def __init__(self, bot: commands.Bot) -> None:
+        self._bot: commands.Bot = bot
+        bot.tree.add_command(app_commands.ContextMenu(name="Avatar", callback=self._avatar))
+        super().__init__()
+
+    async def _avatar(self, interaction: Interaction, user: Member):
+        await interaction.response.defer()
+
+        embed: Embed = Embed(color=ModularUtil.convert_color(ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
+        embed.set_footer(text=f'From {interaction.user} ', icon_url=interaction.user.display_avatar)
+        embed.set_image(url=user.guild_avatar.url if user.guild_avatar is not None else user.avatar.url)
+        embed.description = f"Showing avatar of user <@{user.id}>"
+
+        await interaction.followup.send(embed=embed)
 
 
 class Multimedia(commands.Cog):

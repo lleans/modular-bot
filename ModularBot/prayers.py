@@ -9,7 +9,7 @@ from const import ModularBotConst
 
 
 class Prayers:
-    __PRAYER_LOCATION = "Surabaya"
+    __PRAYER_LOCATION = "Jakarta"
 
     __PRAYER_API = "https://muslim-pro-api-lleans.koyeb.app"
     __BUKA_IMAGE = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",

@@ -1,4 +1,4 @@
-from asyncio import wait, ensure_future
+from asyncio import wait, ensure_future, sleep
 from io import BytesIO
 from re import search, IGNORECASE
 from random import choice
@@ -7,7 +7,8 @@ from os import getenv
 
 from datetime import timedelta, datetime
 from discord.ext import commands, tasks
-from discord import Intents, Message, Embed, TextChannel, Role, Guild, Interaction, VoiceChannel, Member, errors, Member, File, User, Activity, ActivityType, Object
+from discord import Intents, Message, Embed, TextChannel, Role, Guild, Interaction, VoiceChannel, Member, errors, Member, File, Activity, ActivityType
+from discord.abc import GuildChannel
 from aiohttp import ClientSession
 from wavelink.pool import NodePool, Node
 
@@ -26,20 +27,20 @@ class ModularBotTask:
 
     async def _first_pull(self) -> None:
         self._praytimes = await Prayers.get_prayertime(session=self.session)
-        self.message: Message = None
-        await self._ramadhan_checker(self=self)
+        self._praytime_message: Message = None
 
-    @staticmethod
-    async def _ramadhan_checker(self) -> None:
-        self._is_ramadhan: bool = False
-        time: datetime = ModularUtil.get_time()
-        ramadhan_start: datetime = datetime.strptime(self._praytimes['ramadhan']['start'], "%B %d")
-        ramadhan_end: datetime = datetime.strptime(self._praytimes['ramadhan']['end'], "%B %d")
-        if ramadhan_start.date() <= time.date() < ramadhan_end.date():
-            role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
-            channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
-            await channel.set_permissions(role, view_channel=True)
-            self._is_ramadhan = True          
+        async def _ramadhan_checker(self) -> None:
+            self._is_ramadhan: bool = False
+            time: datetime = ModularUtil.get_time()
+            ramadhan_start: datetime = datetime.strptime(self._praytimes['ramadhan']['start'], "%B %d")
+            ramadhan_end: datetime = datetime.strptime(self._praytimes['ramadhan']['end'], "%B %d")
+            if ramadhan_start.date() <= time.date() < ramadhan_end.date():
+                role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
+                channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
+                await channel.set_permissions(role, view_channel=True)
+                self._is_ramadhan = True   
+
+        await _ramadhan_checker(self=self)
 
     @staticmethod
     async def _connect_nodes(bot: commands.Bot) -> None:
@@ -63,43 +64,40 @@ class ModularBotTask:
         
         is_praytime: Union[Embed, None] = Prayers.prayers_generator(praytimes=self._praytimes, time=time)
         if is_praytime is not None:
-            channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
 
-            if message is not None:
-                await message.delete()
+            if self._praytime_message is not None:
+                await self._praytime_messag.delete()
                 
-            message = await channel.send(embed=is_praytime)
+            self._praytime_message = await self._praytime_channel.send(embed=is_praytime)
 
     @tasks.loop(seconds=30)
     async def _lockdown_channel(self) -> None:
         time: datetime = ModularUtil.get_time()
 
+        async def _do_the_lockdown(view_channel: bool):
+            for channel in self._guild.text_channels:
+                    overwrites = channel.overwrites_for(self._role)
+                    if channel.is_nsfw() and channel.id is not GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel is not view_channel:
+                        await channel.set_permissions(self._role, view_channel=view_channel)
+            return
+
         if self._is_ramadhan:
-            role: Role = self._guild.get_role(GuildRole.MAGICIAN)
-            for key, val in self._praytimes.items():
-                timestrip = datetime.strptime(val, '%H:%M')
-                timestrip = timestrip - timedelta(minutes=10)
+            imsak: str = self._praytimes['Subuh'] if 'Subuh' in self._praytimes else self._praytimes['Fajr']
+            buka: str = self._praytimes['Maghrib']
+            imsak: datetime = datetime.strptime(imsak, '%H:%M') - timedelta(minutes=10)
 
-                if timestrip.strftime('%H:%M') == val and (key == "Subuh" or key == "Fajr"):
-                    for channel in self._guild.text_channels:
-                        if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL:
-                            return await channel.set_permissions(role, view_channel=False)
+            if time.strftime('%H:%M') == datetime.strptime(buka, '%H:%M'):
+                await _do_the_lockdown(view_channel=True)
 
-                if timestrip.strftime('%H:%M') == "18:00":
-                    for channel in self._guild.text_channels:
-                        if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL:
-                            return await channel.set_permissions(role, view_channel=True)
+            if time.strftime('%H:%M') == imsak.strftime('%H:%M'):
+                await _do_the_lockdown(view_channel=False)
 
-        if time.strftime('%A-%H') == "Friday-21":
-            role: Role = self._guild.get_role(GuildRole.MAGICIAN)
-            for channel in self._guild.text_channels:
-                if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL:
-                    return await channel.set_permissions(role, view_channel=True)
-        if time.strftime('%A-%H') == "Friday-09":
-            role: Role = self._guild.get_role(GuildRole.MAGICIAN)
-            for channel in self._guild.text_channels:
-                if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL:
-                    return await channel.set_permissions(role, view_channel=False)
+        else:
+            if time.strftime('%A-%H') == "Friday-21":
+                await _do_the_lockdown(view_channel=True)
+
+            if time.strftime('%A-%H') == "Friday-09":
+                await _do_the_lockdown(view_channel=False)
 
 class ModularBotBase:
 
@@ -149,16 +147,30 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
         self.synced: bool = False
         self._guild: Guild = None
+        self._role: Role = None
+        self._praytime_channel: TextChannel = None
 
-    async def on_wavelink_node_ready(self, node: Node):
+    async def on_wavelink_node_ready(self, node: Node) -> None:
         print(f"Node {node.host}, {node._heartbeat}, {node.region} is ready!")
 
+    async def on_guild_channel_delete(self, *_):
+        await bot.anlytics()
+
+    async def on_guild_channel_create(self, *_):
+        await bot.anlytics()
+
+    async def on_guild_role_delete(self, *_):
+        await bot.anlytics()
+
+    async def on_guild_role_create(self, *_):
+        await bot.anlytics()
+
     async def on_member_join(self, member: Member) -> None:
-        if member.guild.id != self._guild.id:
+        if member.guild.id is not self._guild.id:
             return
 
         await self.anlytics()
-        welcome_banner: BytesIO = await ModularUtil.banner_creator(f"{member.name}#{member.discriminator}", member.avatar.url)
+        welcome_banner: BytesIO = await ModularUtil.banner_creator(member, member.avatar.url)
 
         welcome_channel: TextChannel = self.get_channel(GuildChannel.WELCOME_CHANNEL)
         image_file: File = File(BytesIO(welcome_banner.getbuffer()), filename='image.png')
@@ -171,7 +183,7 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
     async def on_member_remove(self, member: Member) -> None:
         await self.anlytics()
-        leave_banner: BytesIO = await ModularUtil.banner_creator(f"{member.name}#{member.discriminator}", member.avatar.url, is_welcome=False)
+        leave_banner: BytesIO = await ModularUtil.banner_creator(member, member.avatar.url, is_welcome=False)
 
         leave_channel: TextChannel = self.get_channel(GuildChannel.GOODBYE_CHANNEL)
         image_file: File = File(BytesIO(leave_banner.getbuffer()), filename='image.png')
@@ -185,10 +197,11 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
             await message.channel.send(embed=await self._help_embed())
 
         # Need fix 
-        react: Union[str, Embed] = Reaction.message_generator(message=message.clean_content)
-        if not react:
-            return
-        await message.channel.send(embed=react) if isinstance(react, Embed) else await message.channel.send(react)
+        if not message.channel.is_nsfw():
+            react: Union[str, Embed] = Reaction.message_generator(message=message.clean_content)
+            if not react:
+                return
+            await message.channel.send(embed=react) if isinstance(react, Embed) else await message.channel.send(react)
 
     async def setup_hook(self) -> None:
         self.session: ClientSession = ClientSession()
@@ -202,7 +215,10 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
     async def on_ready(self) -> None:
         print(f"Logged as {self.user.name}, {self.user.id}")
+        
         self._guild = self.get_guild(ModularBotConst.SERVER_ID)
+        self._role: Role = self._guild.get_role(GuildRole.MAGICIAN)
+        self._praytime_channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
 
         await self._begin_loop_task()
 
