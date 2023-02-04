@@ -79,6 +79,7 @@ class ModularBotTask:
                     overwrites = channel.overwrites_for(self._role)
                     if channel.is_nsfw() and channel.id is not GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel is not view_channel:
                         await channel.set_permissions(self._role, view_channel=view_channel)
+                        await sleep(2)
             return
 
         if self._is_ramadhan:
@@ -129,10 +130,12 @@ class ModularBotBase:
 
         await member_channel_edit.edit(name=f"Jumlah Member: {member_count}")
         await user_channel_edit.edit(name=f"Jumlah User: {the_musketter_count}")
+        await sleep(2)
         await bot_channel_edit.edit(name=f"Jumlah BOT: {bot_count}")
         await channel_channel_edit.edit(name=f"Jumlah Channel: {channel_count}")
+        await sleep(2)
         await role_channel_edit.edit(name=f"Jumlah Role: {role_count}")
-
+        await self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{the_musketter_count} Hamba Allah"))
 
 
 class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
@@ -226,7 +229,6 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
             self.synced = True
 
         await self.anlytics()
-        await self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{len(self._guild.get_role(GuildRole.THE_MUSKETEER).members)} Hamba Allah"))
 
 
 bot: commands.Bot = ModularBotClient()
