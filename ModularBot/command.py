@@ -159,7 +159,7 @@ class Multimedia(commands.Cog):
 
         if not 'timestamp' in self._guild_message[interaction.guild_id]:
             self._guild_message[interaction.guild_id].update({'timestamp': ModularUtil.get_time()})
-
+        
         await wait([ensure_future(channel.connect(cls=Player)),
             interaction.response.send_message("✅ Joined", ephemeral=True)
         ])            

@@ -127,12 +127,11 @@ class ModularBotBase:
         channel_channel_edit: VoiceChannel = self.get_channel(GuildChannel.CHANNEL_ANLYTICS)
         role_channel_edit: VoiceChannel = self.get_channel(GuildChannel.ROLE_ANLYTICS)
 
-        return await wait([ensure_future(member_channel_edit.edit(name=f"Jumlah Member: {member_count}")),
-            ensure_future(user_channel_edit.edit(name=f"Jumlah User: {the_musketter_count}")),
-            ensure_future(bot_channel_edit.edit(name=f"Jumlah BOT: {bot_count}")),
-            ensure_future(channel_channel_edit.edit(name=f"Jumlah Channel: {channel_count}")),
-            ensure_future(role_channel_edit.edit(name=f"Jumlah Role: {role_count}"))
-        ])
+        await member_channel_edit.edit(name=f"Jumlah Member: {member_count}")
+        await user_channel_edit.edit(name=f"Jumlah User: {the_musketter_count}")
+        await bot_channel_edit.edit(name=f"Jumlah BOT: {bot_count}")
+        await channel_channel_edit.edit(name=f"Jumlah Channel: {channel_count}")
+        await role_channel_edit.edit(name=f"Jumlah Role: {role_count}")
 
 
 
@@ -169,25 +168,25 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
         if member.guild.id is not self._guild.id:
             return
 
-        await self.anlytics()
-        welcome_banner: BytesIO = await ModularUtil.banner_creator(member, member.avatar.url)
+        welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member), member.avatar.url)
 
         welcome_channel: TextChannel = self.get_channel(GuildChannel.WELCOME_CHANNEL)
         image_file: File = File(BytesIO(welcome_banner.getbuffer()), filename='image.png')
+        await welcome_channel.send(file=image_file)
 
+        await self.anlytics()
         try:
-            return await wait([ensure_future(welcome_channel.send(file=image_file)), 
-            ensure_future(member.send(GuildMessage.DM_MESSAGE))])
+            return await member.send(GuildMessage.DM_MESSAGE)
         except errors.Forbidden:
             pass
 
     async def on_member_remove(self, member: Member) -> None:
-        await self.anlytics()
-        leave_banner: BytesIO = await ModularUtil.banner_creator(member, member.avatar.url, is_welcome=False)
+        leave_banner: BytesIO = await ModularUtil.banner_creator(str(member), member.avatar.url, is_welcome=False)
 
         leave_channel: TextChannel = self.get_channel(GuildChannel.GOODBYE_CHANNEL)
         image_file: File = File(BytesIO(leave_banner.getbuffer()), filename='image.png')
 
+        await self.anlytics()
         return await leave_channel.send(file=image_file)
 
     async def on_message(self, message: Message) -> None:
@@ -226,9 +225,8 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
             await self.tree.sync()
             self.synced = True
 
-        await wait([ensure_future(self.anlytics()),
-            ensure_future(self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{len(self._guild.get_role(GuildRole.THE_MUSKETEER).members)} Hamba Allah")))
-        ])
+        await self.anlytics()
+        await self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{len(self._guild.get_role(GuildRole.THE_MUSKETEER).members)} Hamba Allah"))
 
 
 bot: commands.Bot = ModularBotClient()
