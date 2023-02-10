@@ -76,10 +76,10 @@ class ModularBotTask:
 
         async def _do_the_lockdown(view_channel: bool):
             for channel in self._guild.text_channels:
-                    overwrites = channel.overwrites_for(self._role)
-                    if channel.is_nsfw() and channel.id is not GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel is not view_channel:
-                        await channel.set_permissions(self._role, view_channel=view_channel)
-                        await sleep(2)
+                overwrites = channel.overwrites_for(self._role)
+                if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel != view_channel:
+                    await channel.set_permissions(self._role, view_channel=view_channel)
+                    await sleep(2)
             return
 
         if self._is_ramadhan:
