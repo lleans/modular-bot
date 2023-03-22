@@ -14,12 +14,12 @@ class Prayers:
     __PRAYER_API = "https://muslim-pro-api-lleans.koyeb.app"
     __BUKA_IMAGE = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",
                     "https://i.imgur.com/eWe8VvA.gif", "https://i.imgur.com/gFVKP74.gif",
-                    "https://files.catbox.moe/un72tu.gif", "https://files.catbox.moe/v0uqbp.gif",
-                    "https://files.catbox.moe/bbps8x.gif"]
+                    "https://i.imgur.com/tW3Hjcb.gif", "https://i.imgur.com/ey1KKAd.gif",
+                    "https://i.imgur.com/Tgx5w3E.gif"]
     __SHALAT_IMAGE = ["https://i.imgur.com/I24KR5n.gif", "https://i.imgur.com/L2Yk6a2.gif",
                     "https://i.imgur.com/cRJQcfJ.gif", "https://i.imgur.com/IV5Nadb.gif",
-                    "https://files.catbox.moe/d0a54j.gif", "https://files.catbox.moe/erh51k.gif",
-                    "https://files.catbox.moe/tdml0y.gif"]
+                    "https://i.imgur.com/zCSohsn.gif", "https://i.imgur.com/OGesUM4.gif",
+                    "https://i.imgur.com/VTPufTo.gif"]
 
     __QUOTES = ["`Salah satu dosa terburuk adalah seseorang yang menganggap remeh dosanya. \n\n- Abu Bakar Asshidiq`",
                 "`Tidak boleh seorang muslim menghina muslim yang lain. Yang kecil pada kaum muslimin, adalah besar pada sisi Allah. \n\n- Abu Bakar Asshidiq`",
