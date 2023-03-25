@@ -114,7 +114,8 @@ class Multimedia(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
-        self._timeout_check.start()
+        if not self._timeout_check.is_running():
+            self._timeout_check.start()
 
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, player: Player, track: Track) -> None:

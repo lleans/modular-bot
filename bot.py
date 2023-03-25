@@ -19,34 +19,40 @@ from ModularBot import ModularUtil, Prayers, Reaction
 
 class ModularBotTask:
 
-    def __init__(self) -> None:
-        self._praytime_message: Message = None
-
     async def _begin_loop_task(self):
-        await self._ramadhan_checker()
-        if self._is_ramadhan:
-            self._prayer_time.start()
-            
-        self._lockdown_channel.start()
-        self._pull_data.start()
-        self._change_activity.start()
+        self._praytime_message: Message = None
+        self._is_ramadhan: bool = False
+        await self._pull_data()
 
+        if not self._pull_data.is_running():
+            self._pull_data.start()
+        
+        if not self._prayer_time.is_running():
+            self._prayer_time.start()    
+        
+        if not self._lockdown_channel.is_running():
+            self._lockdown_channel.start()
 
-    async def _first_pull(self) -> None:
-        self._praytimes = await Prayers.get_prayertime(session=self.session)
+        if not self._change_activity.is_running():
+            self._change_activity.start()
+
 
     async def _ramadhan_checker(self) -> None:
-        self._is_ramadhan: bool = False
         time: datetime = ModularUtil.get_time()
         ramadhan_start: datetime = datetime.strptime(f"{self._praytimes['ramadhan']['start']} {time.strftime('%Y')}", "%B %d %Y")
         ramadhan_end: datetime = datetime.strptime(f"{self._praytimes['ramadhan']['end']} {time.strftime('%Y')}", "%B %d %Y")
         role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
         channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
         
-        if ramadhan_start.date() >= time.date() < ramadhan_end.date():
+        if ramadhan_start.date() <= time.date() < ramadhan_end.date():
             await channel.set_permissions(role, view_channel=True)
             self._is_ramadhan = True  
         else:
+            self._is_ramadhan = False
+
+            if self._praytime_message is not None and time.day > self._praytime_message.created_at.day:
+                self._praytime_message = None
+
             await channel.set_permissions(role, view_channel=False)
 
     @staticmethod
@@ -60,7 +66,7 @@ class ModularBotTask:
             region="singapore"
         )
 
-    @tasks.loop(hours=12)
+    @tasks.loop(hours=3)
     async def _pull_data(self) -> None:
         # Pullin data from API
         self._praytimes = await Prayers.get_prayertime(session=self.session)
@@ -70,13 +76,14 @@ class ModularBotTask:
     async def _prayer_time(self) -> None:
         time: datetime = ModularUtil.get_time()
         
-        is_praytime: Union[Embed, None] = Prayers.prayers_generator(praytimes=self._praytimes, time=time)
-        if is_praytime is not None:
+        if self._is_ramadhan:
+            is_praytime: Union[Embed, None] = Prayers.prayers_generator(praytimes=self._praytimes, time=time)
+            if is_praytime is not None:
 
-            if self._praytime_message is not None:
-                await self._praytime_messag.delete()
-                
-            self._praytime_message = await self._praytime_channel.send(embed=is_praytime)
+                if self._praytime_message is not None:
+                    await self._praytime_message.delete()
+
+                self._praytime_message = await self._praytime_channel.send(embed=is_praytime)
 
     @tasks.loop(seconds=30)
     async def _lockdown_channel(self) -> None:
@@ -91,7 +98,7 @@ class ModularBotTask:
             return
 
         if self._is_ramadhan:
-            imsak: str = self._praytimes['Subuh'] if 'Subuh' in self._praytimes else self._praytimes['Fajr']
+            imsak: str = self._praytimes['Subuh']
             buka: str = self._praytimes['Maghrib']
             imsak: datetime = datetime.strptime(imsak, '%H:%M') - timedelta(minutes=10)
             buka: datetime = datetime.strptime(buka, '%H:%M')
@@ -113,7 +120,6 @@ class ModularBotTask:
     async def _change_activity(self) -> None:
         the_musketter_count: int = len(self._guild.get_role(GuildRole.THE_MUSKETEER).members)
         
-
         async def a() -> None:
             the_musketter_count: int = len(self._guild.get_role(GuildRole.THE_MUSKETEER).members)
             await self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{the_musketter_count} Hamba Allah"))
@@ -122,10 +128,10 @@ class ModularBotTask:
             await self.change_presence(activity=Activity(type=ActivityType.playing, name=f"Main bareng {the_musketter_count} Member"))
 
         async def c() -> None:
-            await self.change_presence(activity=Activity(type=ActivityType.listening, name=f"{ModularBotConst.BOT_NAME}"))
+            await self.change_presence(activity=Activity(type=ActivityType.listening, name=f"@{ModularBotConst.BOT_NAME.strip()}"))
 
         async def d() -> None:
-            await self.change_presence(activity=Activity(type=ActivityType.competing, name=f"{ModularBotConst.SERVER_NAME}"))
+            await self.change_presence(activity=Activity(type=ActivityType.competing, name=f"{ModularBotConst.SERVER_NAME.strip()}"))
         
         await choice([a,b,c,d])()
 
@@ -236,7 +242,6 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
     async def setup_hook(self) -> None:
         self.session: ClientSession = ClientSession()
-        await self._first_pull()
 
         self.loop.create_task(self._connect_nodes(self))
 
@@ -271,5 +276,5 @@ async def _ping(interaction: Interaction) -> None:
     where: str = await ModularUtil.get_geolocation(bot.session)
     await interaction.response.send_message(f":cloud: Ping {round(bot.latency * 1000)}ms, server location {where} :earth_americas:", ephemeral=True)
 
-token: str = getenv("TOKEN") or open("TOKEN").readline()
+token: str = getenv('TOKEN') or open("TOKEN").readline()
 bot.run(token=token.strip())

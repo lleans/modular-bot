@@ -9,7 +9,7 @@ from const import ModularBotConst
 
 
 class Prayers:
-    __PRAYER_LOCATION = "Jakarta"
+    __PRAYER_LOCATION = "DKI Jakarta"
 
     __PRAYER_API = "https://muslim-pro-api-lleans.koyeb.app"
     __BUKA_IMAGE = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",
@@ -39,37 +39,48 @@ class Prayers:
                 res: dict = {}
                 res.update(resp['praytimes'][f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"])
                 res.update({
-                    'ramadhan': resp['ramadhan'][time.strftime('%Y')]
+                    'Maghrib': res.pop('Maghrib'),
+                    'Subuh': res.pop('Fajr'),
+                    'Dhuha': res.pop('Sunrise'),
+                    'Dzuhur': res.pop('Dhuhr'),
+                    'Ashar': res.pop('Asr'),
+                    'Isya': res.pop("Isha'a"),
+                    'ramadhan': resp['ramadhan'][time.strftime('%Y')],
                 })
+
                 return res
             return 
             
 
     @classmethod
     def prayers_generator(cls, praytimes: dict, time: datetime) -> Union[Embed, None]:
-        e: Embed = None
+        e: Embed = Embed(color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])), title=None)
+        e.set_author(name="Muslim Pro", icon_url="https://i.imgur.com/T7Zqnzw.png")
+        e.description = f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal salat hari ini:**"
+        
         for pray, prayt in praytimes.items():
+
+            if time.strftime('%A') == "Friday" and pray == "Dzuhur":
+                pray = "Jumatan"
+
             if prayt == time.strftime('%H:%M'):
-                e = Embed(color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])))
                 e.set_image(url=choice(cls.__SHALAT_IMAGE))
+                
                 if pray == "Maghrib":
-                    e.title = f"Waktu Berbuka untuk area {ModularBotConst.__PRAYER_LOCATION} dan sekitarnya"
-                    e.description = f"Selamat berbuka puasa, bersyukurlah kalian bisa berbuka dengan makanan enak diluar sana masih banyak yang belum bisa kayak kamu, " \
-                        "jadi tetaplah bersyukur walaupun kamu buka dengan tahu tempe :).\nJangan lupa salat Maghrib habis buka.\n\n **Quote hari ini**\n" \
-                        f"{choice(cls.__QUOTES)}\n\n**Jadwal shalat hari ini:**"
+                    e.title = f"Waktu Berbuka untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
+                    e.description = "Selamat Berbuka Puasa. Bersyukurlah kalian bisa berbuka dengan makanan enak, diluar sana masih banyak yang belum bisa kayak kamu. " \
+                        "Jadi, tetaplah bersyukur walaupun kamu buka dengan tahu tempe :).\nJangan lupa Salat Maghrib habis buka.\n\n" + e.description
                     e.set_image(url=choice(cls.__BUKA_IMAGE))
-                elif pray == "Isya" or pray == "Isha'a":
-                    e.title = f"Waktu Terawih untuk area {ModularBotConst.__PRAYER_LOCATION} dan sekitarnya"
-                    e.description = f"Waktunya terawih, bukanya terwaih malah buka nHen..., salat dulu ynag bener!!.\n\n " \
-                        f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal shalat hari ini:**"
+                elif pray == "Isya":
+                    e.title = f"Waktu Salat Tarawih untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
+                    e.description = f"Waktunya Tarawih. Bukanya Tarawih, malah buka nHen..., salat dulu yang bener!!.\n\n" + e.description
                 else:
-                    e.title = f"Waktu {pray} untuk area {ModularBotConst.__PRAYER_LOCATION} dan sekitarnya"
-                    e.description = f"Waktunya salat {pray}, salat yang khusyuk, biar bisa ketemu waifu di isekaid.\n\n " \
-                        f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal shalat hari ini:**"
-        if e is not None:
-            for key, value in praytimes.items():
-                if value != "ramadhan":
-                    e.add_field(name=f"{key}:", value=value)
-            e.set_author(name="Muslim Pro",
-                icon_url="https://i.imgur.com/T7Zqnzw.png")
+                    e.title = f"Waktu Salat {pray} untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
+                    e.description = f"Waktunya Salat {pray}. Salat yang khusyuk, biar bisa ketemu waifu di isekaid.\n\n" + e.description
+            if pray != "ramadhan":
+                    e.add_field(name=f"{pray+' (Buka)' if pray == 'Maghrib' else pray}:", value=prayt)
+
+        if e.title == None:
+            e = None    
+        
         return e
