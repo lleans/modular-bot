@@ -45,14 +45,18 @@ class ModularBotTask:
         channel: TextChannel = self.get_channel(GuildChannel.PRAYER_CHANNEL)
         
         if ramadhan_start.date() <= time.date() < ramadhan_end.date():
-            await channel.set_permissions(role, view_channel=True)
-            self._is_ramadhan = True  
-        else:
-            self._is_ramadhan = False
 
             if self._praytime_message is not None and time.day > self._praytime_message.created_at.day:
                 self._praytime_message = None
 
+            overwrites = channel.overwrites_for(self._role)
+            if not overwrites.view_channel: 
+                await channel.set_permissions(role, view_channel=True)
+                
+            self._is_ramadhan = True  
+        else:
+            self._is_ramadhan = False
+            self._praytime_message = None
             await channel.set_permissions(role, view_channel=False)
 
     @staticmethod
