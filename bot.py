@@ -20,8 +20,6 @@ from ModularBot import ModularUtil, Prayers, Reaction
 class ModularBotTask:
 
     async def _begin_loop_task(self):
-        self._praytime_message: Message = None
-        self._is_ramadhan: bool = False
         await self._pull_data()
 
         if not self._pull_data.is_running():
@@ -38,6 +36,8 @@ class ModularBotTask:
 
 
     async def _ramadhan_checker(self) -> None:
+        self._is_ramadhan: bool = False
+
         time: datetime = ModularUtil.get_time()
         ramadhan_start: datetime = datetime.strptime(f"{self._praytimes['ramadhan']['start']} {time.strftime('%Y')}", "%B %d %Y")
         ramadhan_end: datetime = datetime.strptime(f"{self._praytimes['ramadhan']['end']} {time.strftime('%Y')}", "%B %d %Y")
@@ -46,7 +46,7 @@ class ModularBotTask:
         
         if ramadhan_start.date() <= time.date() < ramadhan_end.date():
 
-            if self._praytime_message is not None and time.day > self._praytime_message.created_at.day:
+            if self._praytime_message is not None and (time.date() - timedelta(days=1)).day == (self._praytime_message.created_at + timedelta(hours=7)).day:
                 self._praytime_message = None
 
             overwrites = channel.overwrites_for(self._role)
@@ -132,10 +132,10 @@ class ModularBotTask:
             await self.change_presence(activity=Activity(type=ActivityType.playing, name=f"Main bareng {the_musketter_count} Member"))
 
         async def c() -> None:
-            await self.change_presence(activity=Activity(type=ActivityType.listening, name=f"@{ModularBotConst.BOT_NAME.strip()}"))
+            await self.change_presence(activity=Activity(type=ActivityType.listening, name=f"@{ModularBotConst.BOT_NAME.replace(' ', '')}"))
 
         async def d() -> None:
-            await self.change_presence(activity=Activity(type=ActivityType.competing, name=f"{ModularBotConst.SERVER_NAME.strip()}"))
+            await self.change_presence(activity=Activity(type=ActivityType.competing, name=f"{ModularBotConst.SERVER_NAME.replace(' ', '')}"))
         
         await choice([a,b,c,d])()
 
@@ -246,6 +246,7 @@ class ModularBotClient(commands.Bot, ModularBotBase, ModularBotTask):
 
     async def setup_hook(self) -> None:
         self.session: ClientSession = ClientSession()
+        self._praytime_message: Message = None
 
         self.loop.create_task(self._connect_nodes(self))
 

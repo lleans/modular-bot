@@ -78,7 +78,7 @@ class Multimedia(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self._bot: commands.Bot = bot
 
-        self._timeout_minutes: int = 30
+        self._timeout_minutes: int = 15
         self._guild_message: dict = {}
         super().__init__()
 
@@ -174,6 +174,7 @@ class Multimedia(commands.Cog):
         if not interaction.user.voice or voice_client.channel != interaction.user.voice.channel:
             return await interaction.response.send_message("❌ Can't do that. \nPlease join the same Voice Channel with bot!!", ephemeral=True)
 
+        await voice_client.stop()
         await voice_client.disconnect()
 
         if interaction.guild_id in self._guild_message:

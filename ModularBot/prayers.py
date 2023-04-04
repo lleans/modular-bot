@@ -23,7 +23,7 @@ class Prayers:
 
     __QUOTES = ["`Salah satu dosa terburuk adalah seseorang yang menganggap remeh dosanya. \n\n- Abu Bakar Asshidiq`",
                 "`Tidak boleh seorang muslim menghina muslim yang lain. Yang kecil pada kaum muslimin, adalah besar pada sisi Allah. \n\n- Abu Bakar Asshidiq`",
-                "`YBuatlah tujuan untuk hidup, kemudian gunakan segenap kekuatan untuk mencapainya, kamu pasti berhasil. \n\n- Ustman Bin Affan`",
+                "`Buatlah tujuan untuk hidup, kemudian gunakan segenap kekuatan untuk mencapainya, kamu pasti berhasil. \n\n- Ustman Bin Affan`",
                 "`Jangan pernah membuat keputusan dalam kemarahan dan jangan pernah membuat janji dalam kebahagiaan. \n\n- Ali Bin Abi Thalib`",
                 "`Memang sulit untuk bersabar, tapi menyia-nyiakan pahala dari sebuah kesabaran itu jauh lebih buruk. \n\n- Abu Bakar Ash-Shiddiq`",
                 "`Terkadang, orang dengan masa lalu paling kelam akan menciptakan masa depan yang paling cerah. \n\n- Umar bin Khattab`",
