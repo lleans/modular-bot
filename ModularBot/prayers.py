@@ -32,24 +32,24 @@ class Prayers:
 
     @classmethod
     async def get_prayertime(cls, session: ClientSession) -> Union[dict, None]:
-        async with session.get(cls.__PRAYER_API+"/"+cls.__PRAYER_LOCATION) as resp:
-            if resp.status == 200:
-                resp: dict = await resp.json()
-                time: datetime = ModularUtil.get_time()
-                res: dict = {}
-                res.update(resp['praytimes'][f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"])
-                res.update({
-                    'Maghrib': res.pop('Maghrib'),
-                    'Subuh': res.pop('Fajr'),
-                    'Dhuha': res.pop('Sunrise'),
-                    'Dzuhur': res.pop('Dhuhr'),
-                    'Ashar': res.pop('Asr'),
-                    'Isya': res.pop("Isha'a"),
-                    'ramadhan': resp['ramadhan'][time.strftime('%Y')],
-                })
+        res: dict = {}
+        while not res:
+            async with session.get(cls.__PRAYER_API+"/"+cls.__PRAYER_LOCATION) as resp:
+                if resp.status == 200:
+                    resp: dict = await resp.json()
+                    time: datetime = ModularUtil.get_time()
+                    res.update(resp['praytimes'][f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"])
+                    res.update({
+                        'Maghrib': res.pop('Maghrib'),
+                        'Subuh': res.pop('Fajr'),
+                        'Dhuha': res.pop('Sunrise'),
+                        'Dzuhur': res.pop('Dhuhr'),
+                        'Ashar': res.pop('Asr'),
+                        'Isya': res.pop("Isha'a"),
+                        'ramadhan': resp['ramadhan'][time.strftime('%Y')],
+                    })
 
-                return res
-            return 
+            return res 
             
 
     @classmethod

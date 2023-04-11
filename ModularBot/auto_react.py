@@ -37,7 +37,7 @@ class Reaction:
 
 
     __REACT_TO = {
-            'bad_words': compile(r'cok|jancok|kontol|bangsat|anjing|anjink|njink|njinc|kntl|goblok|goblog|blok|blog|anjg|bangsad|bngsd|bajingan|mengontol| asu|babi|bego|bacot|jembut|jangkrik|kampret|lonte|monyet|matamu|memek|ngentot|sinting|shit|taek|tolol'),
+            'bad_words': compile(r'cok|jancok|kontol|bangsat|njing|njink|njinc|kntl|goblok|goblog|blok|blog|anjg|bangsad|bngsd|bajingan|mengontol| asu|babi|bego|bacot|jembut|jangkrik|kampret|lonte|monyet|matamu|memek|ngentot|taek|tolol'),
             'stress': compile(r'wangy|ahhhhh|wangi|sepong|ngentot|titit|ngewe|ngentot|ngentod|sange|memek|stress|stres| ewe'),
             'holy_word': compile(r'subhanallah|alhamdullillah|stay halal brader|allahu akbar|allah|alhamdulillah'),
         }
