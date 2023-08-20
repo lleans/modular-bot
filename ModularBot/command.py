@@ -1,500 +1,475 @@
-
-from asyncio import wait, ensure_future
-from random import shuffle
+from asyncio import wait, create_task
 from datetime import timedelta
-from typing import List
-from itertools import islice
+from typing import Union
 
-from discord import app_commands, Interaction, VoiceClient, Embed, Message, TextChannel, Guild, Member
-from discord.ext import commands, tasks
-from wavelink.player import Player
-from wavelink.tracks import YouTubePlaylist, YouTubeTrack, Track
-from wavelink.pool import NodePool
-from wavelink.abc import Playable
+from discord import Interaction, Embed, Member, Role, Message
+from discord.ext import commands
+from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, describe, choices, command, guild_only
+from discord.ui import View
+
+from wavelink import Playable, Player, Playlist, QueueEmpty
+from wavelink.ext.spotify import SpotifyTrack
 
 from .util import ModularUtil
-from const import Expression, GuildRole, ModularBotConst
+from .player import MusicPlayerBase, MusicPlayer, TrackType
+from config import GuildRole, ModularBotConst
 
 
 async def setup(bot: commands.Bot) -> None:
     await wait([
-        ensure_future(bot.add_cog(Administrator(bot=bot))),
-        ensure_future(bot.add_cog(Multimedia(bot=bot))),
-        ensure_future(bot.add_cog(Playground(bot=bot)))
+        bot.add_cog(Administrator(bot)),
+        bot.add_cog(Multimedia(bot)),
+        bot.add_cog(Playground(bot))
     ])
 
-    print("Cog loaded")
-
-async def _handling_error(interaction: Interaction, resp: str) -> None:
-    if not interaction.response.is_done():
-        await interaction.response.send_message(resp)
-    else:
-        await interaction.followup.send(resp)
+    ModularUtil.simple_log("Cog loaded")
 
 
 class Administrator(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self._bot: commands.Bot = bot
-        self._muted: str = "Muted"
+        self._bot.tree.add_command(ContextMenu(
+            name="Revoke Access Magician",
+            callback=self._revoke_magician
+        ))
+        self._bot.tree.add_command(ContextMenu(
+            name="Revoke Access From Server",
+            callback=self._revoke_access
+        ))
         super().__init__()
 
-    @app_commands.command(name='purge', description='To Purge message')
-    @app_commands.checks.has_permissions(manage_messages=True)
+    @command(name='purge', description='To Purge message')
+    @guild_only()
+    @checks.has_permissions(manage_messages=True)
     async def _purge(self, interaction: Interaction, amount: int = 1) -> None:
         await interaction.response.defer(ephemeral=True)
+
         await interaction.channel.purge(limit=amount, check=lambda msg: not interaction.message)
-        temp = await interaction.followup.send(f" ✅ **{amount}** pesan di hapus")
+        temp: Message = await ModularUtil.send_response(interaction, message=f"**{amount}** message purged", emoji="✅")
         await temp.delete(delay=3)
 
-    async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
-        if isinstance(error, commands.MissingPermissions):
-            await _handling_error(interaction=interaction, resp='❌ Missing Permission')
+    @checks.has_permissions(administrator=True)
+    @guild_only()
+    async def _revoke_magician(self, interaction: Interaction, user: Member):
+        await interaction.response.defer(ephemeral=True)
+
+        embed: Embed = Embed(timestamp=ModularUtil.get_time())
+        embed.set_footer(
+            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+        is_exist: Role = user.get_role(GuildRole.MAGICIAN)
+
+        if is_exist:
+            is_exist.delete()
+            embed.color = ModularUtil.convert_color(
+                ModularBotConst.COLOR['success'])
+            embed.description = f"Succesfully revoke <@&{is_exist.name}> from user <@{user.name}>"
         else:
-            await _handling_error(interaction=interaction, resp=f'❌ Uknown error, {Exception(error)}')
+            embed.color = ModularUtil.convert_color(
+                ModularBotConst.COLOR['failed'])
+            embed.description = f"User <@{user.name}> does not have role <@&{is_exist.name}>"
+
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    @checks.has_permissions(administrator=True)
+    @guild_only()
+    async def _revoke_access(self, interaction: Interaction, user: Member):
+        await interaction.response.defer(ephemeral=True)
+
+        embed: Embed = Embed(timestamp=ModularUtil.get_time())
+        embed.set_footer(
+            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+        is_exist: Role = user.get_role(GuildRole.THE_MUSKETEER)
+
+        if is_exist:
+            is_exist.delete()
+            embed.color = ModularUtil.convert_color(
+                ModularBotConst.COLOR['success'])
+            embed.description = f"Succesfully revoke <@&{is_exist.name}> from <@{user.name}>"
+        else:
+            embed.color = ModularUtil.convert_color(
+                ModularBotConst.COLOR['failed'])
+            embed.description = f"<@{user.name}> does not have role <@&{is_exist.name}>"
+
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
+        if isinstance(error, MissingPermissions):
+            await ModularUtil.send_response(interaction, message="Missing Permission", emoji="❌")
+        else:
+            await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
 
         return await super().cog_app_command_error(interaction, error)
+
 
 class Playground(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self._bot: commands.Bot = bot
-        bot.tree.add_command(app_commands.ContextMenu(name="Avatar", callback=self._avatar))
+        self.ctx_menu = ContextMenu(
+            name="Avatar",
+            callback=self._avatar
+        )
+        self._bot.tree.add_command(self.ctx_menu)
         super().__init__()
 
+    @guild_only()
     async def _avatar(self, interaction: Interaction, user: Member):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
-        embed: Embed = Embed(color=ModularUtil.convert_color(ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
-        embed.set_footer(text=f'From {interaction.user} ', icon_url=interaction.user.display_avatar)
-        embed.set_image(url=user.guild_avatar.url if user.guild_avatar is not None else user.avatar.url)
-        embed.description = f"Showing avatar of user <@{user.id}>"
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
+        embed.set_footer(
+            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+        embed.set_image(
+            url=user.guild_avatar.url if user.guild_avatar is not None else user.avatar.url)
+        embed.description = f"Showing avatar of <@{user.id}>"
 
-        await interaction.followup.send(embed=embed)
+        await ModularUtil.send_response(interaction, embed=embed)
 
-
-class Multimedia(commands.Cog):
-
-    def __init__(self, bot: commands.Bot) -> None:
-        self._bot: commands.Bot = bot
-
-        self._timeout_minutes: int = 15
-        self._guild_message: dict = {}
-        super().__init__()
-
-    @staticmethod
-    def parseSec(sec: int) -> str:
-        sec: int = round(sec)
-        m, s = divmod(sec, 60)
-        h, m = divmod(m, 60)
-        if sec > 3600:
-            return f'{h:d}h {m:02d}m {s:02d}s'
-        else:
-            return f'{m:02d}m {s:02d}s'
-
-    async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError) -> None:
-        if isinstance(error, commands.MissingPermissions):
-            await _handling_error(interaction=interaction, resp='❌ Missing Permission')
-        else:
-            await _handling_error(interaction=interaction, resp=f'❌ Uknown error, {Exception(error)}')
+    async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
+        await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
 
         return await super().cog_app_command_error(interaction, error)
 
-    @tasks.loop(seconds=10)
-    async def _timeout_check(self) -> None:
-        for id, key in self._guild_message.items():
-            if ModularUtil.get_time() >= (key['timestamp'] + timedelta(minutes=self._timeout_minutes)):
-                guild: Guild = self._bot.get_guild(id)
-                voice_client: VoiceClient = guild.voice_client
-                if not voice_client.is_playing:
-                    await voice_client.disconnect()
-                    del self._guild_message[id]
-                else:
-                    self._guild_message[id]['timestamp'] = ModularUtil.get_time()
+
+class Multimedia(commands.Cog, MusicPlayer):
+
+    def __init__(self, bot: commands.Bot) -> None:
+        self._bot = bot
+        super().__init__()
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         if not self._timeout_check.is_running():
             self._timeout_check.start()
 
-    @commands.Cog.listener()
-    async def on_wavelink_track_start(self, player: Player, track: Track) -> None:
-        channel: TextChannel = self._bot.get_channel(self._guild_message[player.guild.id]['channel'])
-        embed = Embed(
-            title="Now Playing",
-            color=ModularUtil.convert_color(ModularBotConst.COLOR['queue']),
-            description=f"**[{track.title}]({track.uri}) - {self.parseSec(track.duration)}**"
-        )
-        message: Message = await channel.send(embed=embed)
-        self._guild_message[player.guild.id]['message'] = message.id
-
-    @commands.Cog.listener()
-    async def on_wavelink_track_end(self, player: Player, track: Track, reason) -> None:
-        channel: TextChannel = self._bot.get_channel(self._guild_message[player.guild.id]['channel'])
-        message: Message = await channel.fetch_message(self._guild_message[player.guild.id]['message'])
-        await message.delete()
-        
-
-        if hasattr(player, 'loop') and player.loop is True:
-            player.queue.put_at_front(track)
-            
-        if hasattr(player, 'qloop') and player.qloop is True and not player.loop:
-            await player.queue.put_wait(track)
-
-        if not player.queue.is_empty:
-            next_track: Playable = player.queue.get()
-            await player.play(next_track)
-
-    @app_commands.command(name="join", description="Join an voice channel")
+    @command(name="join", description="Join an voice channel")
+    @guild_only()
+    @MusicPlayerBase._is_user_join_checker()
     async def _join(self, interaction: Interaction) -> None:
-        if not interaction.user.voice:
-            return await interaction.response.send_message("❌ Cannot Join. \nPlease Join Voice channel first!!", ephemeral=True)
+        await wait([
+            create_task(self.join(interaction)),
+            create_task(ModularUtil.send_response(
+                interaction, message="Joined", emoji="✅", ephemeral=True))
+        ])
 
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client:
-            return await interaction.response.send_message("❌ Cannot Join. \nThe bot is already connected to a voice channel!!", ephemeral=True)
-
-        channel: Player = interaction.user.voice.channel 
-        if not interaction.guild_id in self._guild_message:
-            self._guild_message.update({interaction.guild_id: {}})
-
-        if not 'timestamp' in self._guild_message[interaction.guild_id]:
-            self._guild_message[interaction.guild_id].update({'timestamp': ModularUtil.get_time()})
-        
-        await wait([ensure_future(channel.connect(cls=Player)),
-            interaction.response.send_message("✅ Joined", ephemeral=True)
-        ])            
-
-    @app_commands.command(name="leave", description="Leave the voice channel")
+    @command(name="leave", description="Leave the voice channel")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
     async def _leave(self, interaction: Interaction) -> None:
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if not voice_client:
-            return await interaction.response.send_message("❌ Not joined a voice channel", ephemeral=True)
+        await wait([
+            create_task(self.leave(interaction)),
+            create_task(ModularUtil.send_response(
+                interaction, message="Succesfully Disconnected ", emoji="✅", ephemeral=True))
+        ])
 
-        if not interaction.user.voice or voice_client.channel != interaction.user.voice.channel:
-            return await interaction.response.send_message("❌ Can't do that. \nPlease join the same Voice Channel with bot!!", ephemeral=True)
+    @command(name="search", description="Search your track by query")
+    @describe(query="Track keyword", source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)")
+    @guild_only()
+    @MusicPlayerBase._is_user_join_checker()
+    @MusicPlayerBase._is_user_allowed()
+    async def _search(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE) -> None:
+        await interaction.response.defer(ephemeral=True)
+        view: View = View()
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['failed']))
 
-        await voice_client.stop()
-        await voice_client.disconnect()
+        try:
+            embed, view = await self.search(query=query, source=source)
+        except IndexError:
+            embed.description = "❌ Track not found"
 
-        if interaction.guild_id in self._guild_message:
-            del self._guild_message[interaction.guild_id]
-            
-        await interaction.response.send_message("✅ Succesfully Disconnected ", ephemeral=True)
+        await ModularUtil.send_response(interaction, embed=embed, view=view)
 
-    @app_commands.command(name="play", description="To play a song from Youtube")
-    async def _play(self, interaction: Interaction, query: str) -> None:
+    @command(name="play", description="To play a track from Youtube/Soundcloud/Spotify")
+    @describe(query="Youtube/Soundcloud/Spotify link or keyword",
+              source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)",
+              autoplay="Autoplay recomendation from you've been played(Soundcloud not supported)",
+              force_play="Force to play the track(Previous queue still saved)",
+              put_front="Put track on front. Will play after current track end")
+    @choices(autoplay=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)],
+        force_play=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)],
+        put_front=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)])
+    @guild_only()
+    @MusicPlayerBase._is_user_join_checker()
+    @MusicPlayerBase._is_user_allowed()
+    async def _play(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE, autoplay: Choice[int] = 0, force_play: Choice[int] = 0, put_front: Choice[int] = 0) -> None:
         await interaction.response.defer()
 
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nPlease Join Voice channel first!!")
+        autoplay = Choice(
+            name="None", value=None) if autoplay == 0 else autoplay
+        force_play = Choice(
+            name="None", value=None) if force_play == 0 else force_play
+        put_front = Choice(
+            name="None", value=None) if put_front == 0 else put_front
 
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
+        convert_autoplay: bool = False
+        convert_force_play: bool = False
+        convert_put_front: bool = False
+        track: Union[Playlist, Playable, SpotifyTrack] = None
+        is_playlist = is_queued = is_played = False
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['failed']), description="❌ Track not found")
 
-        if not voice_client:
-            voice_client: Player = await interaction.user.voice.channel.connect(cls=Player)
-        else:
-            voice_client: Player = interaction.user.guild.voice_client
+        if autoplay.value == None:
+            convert_autoplay = None
 
-        embed: Embed = Embed(color=ModularUtil.convert_color(ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
-        embed.set_footer(text=f'From {interaction.user} ', icon_url=interaction.user.display_avatar)
-                
-                
-        if not query.startswith("http"):
-            search: Playable = await YouTubeTrack.search(query=query, return_first=True)
-        elif "playlist?" in query:
-            search: List[YouTubePlaylist] = await YouTubePlaylist.search(query=query)
-        else:
-            search: Playable = await NodePool.get_node().get_tracks(YouTubeTrack, query)
-            search = search[0]
+        if autoplay.value == 1:
+            convert_autoplay = True
 
-        if not interaction.guild_id in self._guild_message:
-            self._guild_message.update({interaction.guild_id: {}})
-        
-        if not 'channel' in self._guild_message[interaction.guild_id]:
-            self._guild_message[interaction.guild_id].update({'channel': interaction.channel_id})
+        if force_play.value == 1:
+            convert_force_play = True
 
-        if not 'timestamp' in self._guild_message[interaction.guild_id]:
-            self._guild_message[interaction.guild_id].update({'timestamp': ModularUtil.get_time()})
-        
+        if put_front.value == 1:
+            convert_put_front = True
 
-        if isinstance(search, YouTubePlaylist):
-            for src in search.tracks:
-                await voice_client.queue.put_wait(src)
+        # try:
+        track, is_playlist, is_queued, is_played = await self.play(interaction,
+                                                                   query=query,
+                                                                   source=source,
+                                                                   autoplay=convert_autoplay,
+                                                                   force_play=convert_force_play,
+                                                                   put_front=convert_put_front)
 
-            embed.description = f"✅ Queued - {len(search.tracks)} tracks from ** [{search.name}]({query})**"
-            if not voice_client.is_playing():
-                search: Playable = await voice_client.queue.get_wait()
-                await voice_client.play(search)
+        embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_played=is_played, is_put_front=convert_put_front, raw_query=query)
+        # except IndexError:
+        #     embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+        #     embed.description = "❌ Track not found"
 
-        elif voice_client.is_playing():
-            await voice_client.queue.put_wait(item=search)
-            embed.description = f"✅ Queued - **[{search.title}]({search.uri})**"
-        else:
-            await voice_client.play(search)
-            embed.description = f"🎶 Playing - **[{voice_client.source.title}]({search.uri})**"
-        
-        await interaction.followup.send(embed=embed)
+        await ModularUtil.send_response(interaction, embed=embed)
 
-    @app_commands.command(name="queue", description="Song queue")
-    async def _queue(self, interaction: Interaction) -> None:
-        limit_show: int = 10
+    @command(name="queue", description="Show current player queue")
+    @describe(is_history="Show player history instead queue")
+    @choices(is_history=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)])
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    async def _queue(self, interaction: Interaction, is_history: Choice[int] = 0) -> None:
         await interaction.response.defer(ephemeral=True)
 
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
+        is_history = Choice(
+            name="None", value=None) if is_history == 0 else is_history
 
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
+        convert_is_history: bool = False
+        embed: Embed = Embed(description="📪 No tracks found", color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['failed']))
+        view: View = None
 
-        player: Player = interaction.user.guild.voice_client
-        queue: str = ""
-        embed: Embed = Embed(title="Queue", color=ModularUtil.convert_color(ModularBotConst.COLOR['queue']))
-        
-        if hasattr(player, 'queue'):
-            for count, ele in enumerate(islice(player.queue, limit_show)):
-                try:
-                    isClass: str = str(type(ele)).split(".")[0]
-                    if isClass == "<class 'wavelink":
-                        ele = await ele._search()
-                except:
-                    pass
-                
-                queue += f"{count+1}. **[{ele.info['title']}]({ele.info['uri']})** - {self.parseSec(ele.duration) }\n"
+        if is_history.value == 1:
+            convert_is_history = True
 
-        if not queue:
-            embed.description = "📪 No music queued"
-            embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
-        else:
-            embed.description = queue
-            embed.description += f"\n and {len(player.queue) - 10} more..."
-            
-        await interaction.followup.send(embed=embed)
-            
+        try:
+            embed, view = await self.queue(interaction, is_history=convert_is_history)
+        except QueueEmpty:
+            pass
 
-    @app_commands.command(name="skip", description="Skip a song")
+        await ModularUtil.send_response(interaction, embed=embed, view=view)
+
+    @command(name="skip", description="Skip current track")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _skip(self, interaction: Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
-        
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-
-        voice_client: Player = interaction.user.guild.voice_client
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
-        
-        if not voice_client.is_playing():
-            return await interaction.followup.send("📪 Nothing is playing")
-
+        await interaction.response.defer()
         embed: Embed = Embed(
             description="⏯️ Skipped",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
         )
 
-        await interaction.followup.send(embed=embed, ephemeral=False)
+        await wait([
+            create_task(self.skip(interaction)),
+            create_task(ModularUtil.send_response(interaction, embed=embed))
+        ])
 
-        if voice_client.queue.is_empty:
-            return await voice_client.stop()
+    @command(name="jump", description="Jump on specific music(Put selected track into front)")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
+    async def _skip(self, interaction: Interaction) -> None:
+        await interaction.response.defer()
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['failed']))
 
-        await voice_client.seek(voice_client.track.length * 1000)
+        try:
+            embed, view = await self.jump(interaction)
+        except IndexError:
+            embed.description = "📪 Queue is empty"
 
-        if voice_client.is_paused():
-            return await voice_client.resume()
+        await ModularUtil.send_response(interaction, embed=embed, view=view)
 
-    @app_commands.command(name="stop", description="Stop a song")
+    @command(name="previous", description="Play previous track(All queue still saved)")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
+    async def _previous(self, interaction: Interaction) -> None:
+        await interaction.response.defer()
+
+        embed: Embed = Embed(
+            description="⏮️ Previous",
+            color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+        )
+
+        was_allowed: bool = await self.previous(interaction)
+
+        if not was_allowed:
+            embed.description = "📪 History is empty"
+
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    @command(name="stop", description="Stop anything(This will reset player back to initial state)")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _stop(self, interaction: Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-
-        voice_client: Player = interaction.user.guild.voice_client
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
-        
-        if not voice_client.is_playing():
-            return await interaction.followup.send("📪 Nothing is playing")
+        await interaction.response.defer()
 
         embed: Embed = Embed(
             description="⏹️ Stopped",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
         )
-        
-        await voice_client.stop()
-        await interaction.followup.send(embed=embed, ephemeral=False)
 
-    @app_commands.command(name="clear", description="Clear queue")
+        await wait([
+            create_task(self.stop(interaction)),
+            create_task(ModularUtil.send_response(interaction, embed=embed))
+        ])
+
+    @command(name="clear", description="Clear current queue(This will also disable Autoplay and any loop state)")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _clear(self, interaction: Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
+        await interaction.response.defer()
 
         embed: Embed = Embed(
-            description="❌ Cannot clear. \nPlease make sure to have a queue list",
-            color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+            description="✅ Cleared",
+            color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
 
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send(embed=embed)
+        self.clear(interaction)
+        await ModularUtil.send_response(interaction, embed=embed)
 
-        player: Player = interaction.user.guild.voice_client
-        if not player.queue.is_empty:
-            player.queue.clear()
-            embed.description = "✅ Cleared"
-            embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['success'])
-
-        await interaction.followup.send(embed=embed, ephemeral=False)
-
-    @app_commands.command(name="shuffle", description="Shuffle song")
+    @command(name="shuffle", description="Shuffle current queue")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _shuffle(self, interaction: Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-
-        voice_client: Player = interaction.user.guild.voice_client
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
-
-        if voice_client.queue.is_empty:
-            return await interaction.followup.send("📪 Queue is empty")
+        await interaction.response.defer()
 
         embed: Embed = Embed(
             description="🔀 Shuffled",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
 
-        shuffle(voice_client.queue._queue)
-        return await interaction.followup.send(embed=embed, ephemeral=False)
-    
-    @app_commands.command(name="np", description="Now playing song")
+        self.shuffle(interaction)
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    @command(name="now_playing", description="Show current playing track")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _now_playing(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
+        player: Player = None
+        time: int = int()
 
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel",)
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-        
-        if not voice_client.is_playing():
-            return await interaction.followup.send("📪 Nothing is playing")
-
-        pos: int = voice_client.position
-        duration: int = voice_client.source.duration
-        time: int = duration - pos
+        player, time = self.now_playing(interaction)
 
         embed: Embed = Embed(
             title="🎶 Now Playing",
-            description=f"""**[{voice_client.source.title}]({voice_client.source.info['uri']}) - {self.parseSec(voice_client.source.duration)}** 
+            description=f"""**[{player.current.title}]({player.current.uri}) - {self._parseSec(player.current.duration)}** 
             \n** {str(timedelta(seconds=time)).split('.')[0]} left**""",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['play'])
         )
 
-        await interaction.followup.send(embed=embed, ephemeral=False)
+        await ModularUtil.send_response(interaction, embed=embed)
 
-    @app_commands.command(name="loop", description="Loop current track")
-    async def _loop(self, interaction: Interaction) -> None:
-        await interaction.response.defer(ephemeral=True)
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
+    @command(name="loop", description="Loop current track")
+    @describe(is_queue="Loop current player queue, instead current track(History are included)")
+    @choices(is_queue=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)])
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
+    async def _loop(self, interaction: Interaction, is_queue: Choice[int] = 0) -> None:
+        await interaction.response.defer()
+        loop = False
 
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
+        is_queue = Choice(
+            name="None", value=None) if is_queue == 0 else is_queue
 
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
-
+        convert_is_queue: bool = False
         embed: Embed = Embed(
-            description="❌ Cannot loop. \nPlease make sure to have a music playing",
-            color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+            color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
-        
-        player: Player = interaction.user.guild.voice_client
-        if not player.is_playing:
-            return await interaction.followup.send(embed=embed)
 
-        if hasattr(player, 'loop'):
-            player.loop = not player.loop
+        if is_queue.value == 1:
+            convert_is_queue = True
+
+        loop = self.loop(interaction, is_queue=convert_is_queue)
+
+        if not convert_is_queue:
+            embed.description = "✅ Loop Track" if loop else "✅ Unloop Track"
         else:
-            setattr(player, 'loop', True)
-        
-        embed.description = "✅ Loop Track" if player.loop else "✅ Unloop Track"
-        embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['success'])
+            embed.description = "✅ Loop Queue" if loop else "✅ Unloop Queue"
 
-        await interaction.followup.send(embed=embed, ephemeral=False)      
+        await ModularUtil.send_response(interaction, embed=embed)
 
-    @app_commands.command(name="pause", description="Pause song")
+    @command(name="pause", description="Pause current track")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _pause(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-
-        voice_client: Player = interaction.user.guild.voice_client
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
 
         embed: embed = Embed(
             description="⏸️ Paused",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
 
-        if voice_client.is_playing() and not voice_client.is_paused():
-            return await wait([ensure_future(voice_client.pause()),
-                ensure_future(interaction.followup.send(embed=embed))
-            ])
-        
-        await interaction.followup.send("📪 Nothing is playing", ephemeral=False)
-            
+        await wait([
+            self.pause(interaction),
+            ModularUtil.send_response(interaction, embed=embed)
+        ])
 
-    @app_commands.command(name="resume", description="Resume song")
+    @command(name="resume", description="Resume current track")
+    @guild_only()
+    @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
     async def _resume(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-        if not interaction.user.voice:
-            return await interaction.followup.send("❌ Can't do that. \nYou must in Voice Channel")
-
-        voice_client: VoiceClient = interaction.user.guild.voice_client
-        if voice_client and voice_client.channel != interaction.user.voice.channel:
-            return await interaction.followup.send("❌ Can't do that. \nPlease join the same Voice Channel with bot!!")
-
-        voice_client: Player = interaction.user.guild.voice_client
-        if not interaction.user.guild.voice_client:
-            return await interaction.followup.send("🛑 The bot is not connected to a voice channel")
 
         embed: Embed = Embed(
             description="▶️ Resumed",
             color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
 
-        if voice_client.is_paused():
-            return await wait([ensure_future(voice_client.resume()),
-                ensure_future(interaction.followup.send(embed=embed))
-            ])
-        
-        await interaction.followup.send("📪 Nothing is paused", ephemeral=False)
+        res: bool = await self.resume(interaction)
+
+        if not res:
+            return await ModularUtil.send_response(interaction, message="Nothing is paused", emoji="📭")
+
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    # async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
+    #     await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
+
+    #     return await super().cog_app_command_error(interaction, error)

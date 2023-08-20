@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Union
 
 from .util import ModularUtil
-from const import ModularBotConst
+from config import ModularBotConst
 
 
 class Prayers:
@@ -48,6 +48,8 @@ class Prayers:
                         'Isya': res.pop("Isha'a"),
                         'ramadhan': resp['ramadhan'][time.strftime('%Y')],
                     })
+                else:
+                    raise Exception("API problem")
 
             return res 
             

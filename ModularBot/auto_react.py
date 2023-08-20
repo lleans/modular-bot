@@ -5,7 +5,7 @@ from typing import Union
 from discord import Embed
 
 from .util import ModularUtil
-from const import ModularBotConst
+from config import ModularBotConst
 
 
 class Reaction:

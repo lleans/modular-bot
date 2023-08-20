@@ -1,9 +1,12 @@
+from os import getenv
 
 class ModularBotConst:
     SERVER_NAME = "Kantin Yoyok"
     BOT_NAME = "Pak Yoyok"
+    BOT_PREFIX = "!pkyyk"
     SERVER_ID = 623123009770749974
     TIMEZONE = "Asia/Jakarta"
+    REQUEST_LIMIT = 2
     COLOR = {
         'random_array': ["ffe552", "ffc052", "ff7d52", "ff5252", "ff5289", "ff5252"],
         'success': '198754',
@@ -17,6 +20,16 @@ class ModularBotConst:
         'leave_banner': "https://cdn.discordapp.com/attachments/709580371146047498/802553806557544488/NlWRR4o.png"
     }
 
+    #Begin Environment Variable
+    #TODO change it after debugging
+    TOKEN = getenv("TOKEN") or open("TOKEN").readline()
+    # TOKEN = open("TOKEN").readline()
+    SPOTIFY_CLIENT = getenv('SPOTIFY_CLIENT')
+    SPOTIFY_SECRET = getenv('SPOTIFY_SECRET')
+    LAVALINK_SERVER = getenv("LAVLINK_SERVER")
+    LAVALINK_PASSWORD = getenv("LAVALINK_PASSWORD")
+
+
 
 class GuildChannel:
     BINCANG_HARAM_CHANNEL = 783138508038471701
@@ -29,8 +42,8 @@ class GuildChannel:
     MEMBER_ANALYTICS = 788003407834906664
     USER_ANALYTICS = 788003408006217749
     BOT_ANALYTICST = 788003408846127154
-    CHANNEL_ANLYTICS = 788003409327685642
-    ROLE_ANLYTICS = 788003409797840926
+    CHANNEL_ANALYTICS = 788003409327685642
+    ROLE_ANALYTICS = 788003409797840926
 
 
 class GuildRole:
