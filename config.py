@@ -22,11 +22,11 @@ class ModularBotConst:
 
     #Begin Environment Variable
     #TODO change it after debugging
-    TOKEN = getenv("TOKEN") or open("TOKEN").readline()
+    TOKEN = getenv("TOKEN")
     # TOKEN = open("TOKEN").readline()
     SPOTIFY_CLIENT = getenv('SPOTIFY_CLIENT')
     SPOTIFY_SECRET = getenv('SPOTIFY_SECRET')
-    LAVALINK_SERVER = getenv("LAVLINK_SERVER")
+    LAVALINK_SERVER = getenv("LAVALINK_SERVER")
     LAVALINK_PASSWORD = getenv("LAVALINK_PASSWORD")
 
 

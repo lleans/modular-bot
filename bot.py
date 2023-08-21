@@ -80,7 +80,7 @@ class ModularBotTask:
         try:
             self._praytimes = await Prayers.get_prayertime(session=self.session)
             await self._ramadhan_checker()
-        except Exception("API Problem"):
+        except:
             pass
 
     @tasks.loop(seconds=30)
@@ -193,8 +193,8 @@ class ModularBotBase(commands.Bot):
 
         for channel, name in zip(voice_channels, texts):
             await wait([
-                channel.edit(name=name),
-                sleep(ModularBotConst.REQUEST_LIMIT)
+                create_task(channel.edit(name=name)),
+                create_task(sleep(ModularBotConst.REQUEST_LIMIT))
             ])
 
 

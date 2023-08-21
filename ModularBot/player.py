@@ -1,6 +1,6 @@
 
 from datetime import timedelta
-from asyncio import wait
+from asyncio import wait, create_task
 from typing import Union, Tuple
 from itertools import chain
 from random import choice
@@ -24,8 +24,8 @@ from config import ModularBotConst
 
 class TrackView(View):
 
-    def __init__(self, player: Player, *, timeout: float | None = None):
-        self._track_control: MusicPlayer = MusicPlayer()
+    def __init__(self, control, /, player: Player, *, timeout: float | None = None):
+        self._track_control: MusicPlayer = control
         self._player: Player = player
         self._is_playing: bool = self._player.is_playing()
         self._is_loop: bool = self._player.queue.loop
@@ -70,11 +70,8 @@ class TrackView(View):
 
     async def _update_message(self, interaction: Interaction) -> None:
         self._update_button()
-        embed: Embed = await self.create_embed(interaction)
-
         try:
-            message: Message = await interaction.original_response()
-            await message.edit(view=self, embed=embed)
+            await interaction.edit_original_response(view=self, embed=self.create_embed())
         except NotFound:
             pass
 
@@ -124,9 +121,9 @@ class TrackView(View):
 
 class SelectView(View):
 
-    def __init__(self, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, *, timeout: float | None = 180):
+    def __init__(self, control, /, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, *, timeout: float | None = 180):
         self._data: list[Union[Playable, SpotifyTrack]] = list(data)
-        self._track_control: MusicPlayer = MusicPlayer()
+        self._track_control: MusicPlayer = control
         self._selected: Union[Playable, SpotifyTrack] = None
         self._is_jump_command: bool = is_jump_command
         self.rand_emoji: list(str) = ["🎼", "🎵", "🎶", "🎸", "🎷", "🎺", "🎹"]
@@ -141,53 +138,34 @@ class SelectView(View):
                              color=ModularUtil.convert_color(ModularBotConst.COLOR['queue']))
         return embed
 
-    def _convert_into_playable(self, name: str):
-        for track in self._data:
-            if track.title == name:
-                self._selected = track
-
     def _pass_data_to_option(self) -> list[SelectOption]:
-        title = desc = str()
-        for track in self._data:
-            if track.title != title and f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}" != desc:
-                self._selector.options.append(SelectOption(
-                    label=track.title, description=f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji)))
-            title = track.title
-            desc = f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}"
+        if not self._data:
+            raise IndexError
 
-    async def _search_command(self, interaction: Interaction) -> None:
-        track, is_playlist, is_queued, is_played = await self._track_control.play(interaction, query=self._selected)
-
-        self._track_control._record_timestamp(guild_id=interaction.guild_id,
-                                              channel=interaction.channel_id,
-                                              interaction=interaction)
-
-        embed: Embed = await self._track_control._play_response(
-            interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_played=is_played, is_put_front=False)
-        message: Message = await ModularUtil.send_response(interaction, embed=embed)
-
-        self._track_control._record_message(
-            interaction.guild_id, message=message.id)
+        for index, track in enumerate(self._data):
+            self._selector.options.append(SelectOption(
+                label=track.title, description=f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))       
 
     @select(placeholder="🎶 Select your search result!")
     async def _selector(self, interaction: Interaction, select: Select) -> None:
         await interaction.response.defer()
 
-        self._convert_into_playable(select.values[0])
-        message: Message = await interaction.original_response()
-        await message.delete()
+        self._selected = self._data[int(select.values[0])]
+        select.disabled = True
+        select.placeholder = f"{select.options[int(select.values[0])].emoji} {select.options[int(select.values[0])].label}"
+        self._cancel_button.disabled = True
+        await interaction.edit_original_response(view=self)
 
         if not self._is_jump_command:
-            self._search_command(interaction)
+             _, _, _, _ = await self._track_control.play(interaction, query=self._selected)
         else:
-            self._track_control.skip(
+            await self._track_control.skip(
                 interaction, index=self._data.index(self._selected))
 
     @button(label="Cancel", emoji="✖️", style=ButtonStyle.red)
     async def _cancel_button(self, interaction: Interaction, _) -> None:
         await interaction.response.defer()
-        message: Message = await interaction.original_response()
-        await message.delete()
+        await interaction.delete_original_response()
 
 
 class QueueView(View):
@@ -262,8 +240,7 @@ class QueueView(View):
 
     async def _update_message(self, interaction: Interaction):
         self._update_buttons()
-        message: Message = await interaction.original_response()
-        await message.edit(view=self, embed=self.get_embed)
+        await interaction.edit_original_response(view=self, embed=self.get_embed)
 
     @button(label="<<", style=ButtonStyle.secondary)
     async def _first_page_button(self, interaction: Interaction, _) -> None:
@@ -384,7 +361,7 @@ class MusicPlayerBase:
         async def decorator(interaction: Interaction) -> bool:
             isTrue: bool = True
             player: Player = interaction.guild.voice_client
-            if not player.is_playing():
+            if player and not player.is_playing():
                 await ModularUtil.send_response(interaction, message="Can't do that. \nNothing is playing", emoji="📪")
                 isTrue = False
 
@@ -533,7 +510,7 @@ class MusicPlayerBase:
         interaction: Interaction = self._guild_message[player.guild.id]['interaction']
         channel: TextChannel = self._bot.get_channel(
             self._guild_message[player.guild.id]['channel'])
-        track_view: TrackView = TrackView(player=player)
+        track_view: TrackView = TrackView(self, player=player)
 
         embed: Embed = await track_view.create_embed(interaction)
         message: Message = await channel.send(embed=embed)
@@ -577,7 +554,7 @@ class MusicPlayer(MusicPlayerBase):
         embed: Embed = None
 
         tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=source, is_search=True)
-        view: SelectView = SelectView(tracks)
+        view: SelectView = SelectView(self, data=tracks)
         embed = view.get_embed
 
         return (embed, view)
@@ -591,7 +568,8 @@ class MusicPlayer(MusicPlayerBase):
         else:
             player = interaction.user.guild.voice_client
 
-        track_type: TrackType = TrackType.what_type(uri=query) or source
+        track_type: TrackType = (TrackType.what_type(
+            uri=query) if not isinstance(query, Playable) else None) or source
 
         if not isinstance(query, (Playable, SpotifyTrack)):
             tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=track_type)
@@ -660,8 +638,15 @@ class MusicPlayer(MusicPlayerBase):
         player: Player = interaction.user.guild.voice_client
 
         if index is not None:
-            track: Union[Playable, SpotifyTrack] = player.queue[index]
-            del player.queue[index]
+            track: Union[Playable, SpotifyTrack] = None
+            
+            if index < player.queue.count:
+                track = player.queue[index]
+                del player.queue[index]
+            else:
+                index -= player.queue.count
+                track = player.auto_queue[index]
+                del player.auto_queue[index]
             player.queue.put_at_front(track)
 
         await player.seek(player.current.length * 1000)
@@ -675,7 +660,8 @@ class MusicPlayer(MusicPlayerBase):
         view: View = None
         embed: Embed = None
 
-        view: SelectView = SelectView(chain(player.queue, player.auto_queue))
+        view: SelectView = SelectView(
+            self, data=chain(player.queue, player.auto_queue), is_jump_command=True)
         embed = view.get_embed
 
         return (embed, view)

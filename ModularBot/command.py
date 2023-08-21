@@ -4,7 +4,7 @@ from typing import Union
 
 from discord import Interaction, Embed, Member, Role, Message
 from discord.ext import commands
-from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, describe, choices, command, guild_only
+from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, describe, choices, command, guild_only, CheckFailure
 from discord.ui import View
 
 from wavelink import Playable, Player, Playlist, QueueEmpty
@@ -156,7 +156,9 @@ class Multimedia(commands.Cog, MusicPlayer):
 
     @command(name="leave", description="Leave the voice channel")
     @guild_only()
+    @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_client_exist()
+    @MusicPlayerBase._is_user_allowed()
     async def _leave(self, interaction: Interaction) -> None:
         await wait([
             create_task(self.leave(interaction)),
@@ -170,7 +172,7 @@ class Multimedia(commands.Cog, MusicPlayer):
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_user_allowed()
     async def _search(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE) -> None:
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         view: View = View()
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']))
@@ -178,7 +180,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         try:
             embed, view = await self.search(query=query, source=source)
         except IndexError:
-            embed.description = "❌ Track not found"
+            embed.description = "❌ Track not found, check your keyword"
 
         await ModularUtil.send_response(interaction, embed=embed, view=view)
 
@@ -230,18 +232,18 @@ class Multimedia(commands.Cog, MusicPlayer):
         if put_front.value == 1:
             convert_put_front = True
 
-        # try:
-        track, is_playlist, is_queued, is_played = await self.play(interaction,
-                                                                   query=query,
-                                                                   source=source,
-                                                                   autoplay=convert_autoplay,
-                                                                   force_play=convert_force_play,
-                                                                   put_front=convert_put_front)
+        try:
+            track, is_playlist, is_queued, is_played = await self.play(interaction,
+                                                                    query=query,
+                                                                    source=source,
+                                                                    autoplay=convert_autoplay,
+                                                                    force_play=convert_force_play,
+                                                                    put_front=convert_put_front)
 
-        embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_played=is_played, is_put_front=convert_put_front, raw_query=query)
-        # except IndexError:
-        #     embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
-        #     embed.description = "❌ Track not found"
+            embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_played=is_played, is_put_front=convert_put_front, raw_query=query)
+        except IndexError:
+            embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+            embed.description = "❌ Track not found"
 
         await ModularUtil.send_response(interaction, embed=embed)
 
@@ -278,7 +280,6 @@ class Multimedia(commands.Cog, MusicPlayer):
     @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
     async def _skip(self, interaction: Interaction) -> None:
         await interaction.response.defer()
         embed: Embed = Embed(
@@ -295,8 +296,7 @@ class Multimedia(commands.Cog, MusicPlayer):
     @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
-    async def _skip(self, interaction: Interaction) -> None:
+    async def _jump(self, interaction: Interaction) -> None:
         await interaction.response.defer()
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']))
@@ -312,7 +312,6 @@ class Multimedia(commands.Cog, MusicPlayer):
     @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
     async def _previous(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -350,7 +349,6 @@ class Multimedia(commands.Cog, MusicPlayer):
     @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
     async def _clear(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -366,7 +364,6 @@ class Multimedia(commands.Cog, MusicPlayer):
     @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
     async def _shuffle(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -469,7 +466,8 @@ class Multimedia(commands.Cog, MusicPlayer):
 
         await ModularUtil.send_response(interaction, embed=embed)
 
-    # async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
-    #     await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
+    async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
+        if not isinstance(error, CheckFailure):
+            await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
 
-    #     return await super().cog_app_command_error(interaction, error)
+        return await super().cog_app_command_error(interaction, error)
