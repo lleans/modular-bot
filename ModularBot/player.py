@@ -1,6 +1,6 @@
 
 from datetime import timedelta
-from asyncio import wait, create_task
+from asyncio import wait
 from typing import Union, Tuple
 from itertools import chain
 from random import choice
@@ -556,6 +556,9 @@ class MusicPlayerBase:
 
     @commands.Cog.listener()
     async def on_wavelink_websocket_closed(self, payload: WebsocketClosedPayload) -> None:
+        if payload.player.is_playing():
+            await wait([self._clear_message(payload.player.guild.id)])
+
         if payload.by_discord:
             await payload.player.disconnect()
             del self._guild_message[payload.player.guild.id]
