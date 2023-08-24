@@ -6,7 +6,8 @@ from itertools import chain
 from random import choice
 from enum import Enum
 
-from discord import Interaction, VoiceClient, Embed, Message, TextChannel, Guild, VoiceChannel, ButtonStyle, SelectOption
+from discord import Interaction, VoiceClient, Embed, Message, TextChannel, Guild, VoiceChannel, ButtonStyle, SelectOption, Member
+from discord.interactions import Interaction
 from discord.ui import View, Select, button, select
 from discord.errors import NotFound
 from discord.ext import commands, tasks
@@ -71,9 +72,23 @@ class TrackView(View):
     async def _update_message(self, interaction: Interaction) -> None:
         self._update_button()
         try:
-            await interaction.edit_original_response(view=self, embed=self.create_embed())
+            embed: Embed = await self.create_embed(interaction=interaction)
+            await interaction.edit_original_response(view=self, embed=embed)
         except NotFound:
             pass
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        isTrue = True
+        # Check whether user is joined
+        if not interaction.user.voice:
+            await ModularUtil.send_response(interaction, message="Can't do that. \nPlease Join Voice channel first!!", emoji="❌", ephemeral=True)
+            isTrue = False
+        # Check wheter user is allowed
+        elif interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
+            await ModularUtil.send_response(interaction, message="Can't do that. \nPlease join the same Voice Channel with bot!!", emoji="🛑", ephemeral=True)
+            isTrue = False
+
+        return isTrue
 
     def _update_button(self) -> None:
         self._previous.disabled = self._is_previous_disabled or self._is_loop
@@ -121,9 +136,10 @@ class TrackView(View):
 
 class SelectView(View):
 
-    def __init__(self, control, /, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, *, timeout: float | None = 180):
+    def __init__(self, control, author, /, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, *, timeout: float | None = 180):
         self._data: list[Union[Playable, SpotifyTrack]] = list(data)
         self._track_control: MusicPlayer = control
+        self.author: Member = author
         self._selected: Union[Playable, SpotifyTrack] = None
         self._is_jump_command: bool = is_jump_command
         self.rand_emoji: list(str) = ["🎼", "🎵", "🎶", "🎸", "🎷", "🎺", "🎹"]
@@ -144,7 +160,15 @@ class SelectView(View):
 
         for index, track in enumerate(self._data):
             self._selector.options.append(SelectOption(
-                label=track.title, description=f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))       
+                label=track.title, description=f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        isTrue: bool = True
+        if interaction.user.id != self.author.id:
+            await ModularUtil.send_response(interaction, message="Couldn't do that. \nThis is not your request!!", emoji="🛑", ephemeral=True)
+            isTrue = False
+
+        return isTrue
 
     @select(placeholder="🎶 Select your search result!")
     async def _selector(self, interaction: Interaction, select: Select) -> None:
@@ -157,7 +181,7 @@ class SelectView(View):
         await interaction.edit_original_response(view=self)
 
         if not self._is_jump_command:
-             _, _, _, _ = await self._track_control.play(interaction, query=self._selected)
+            _, _, _, _ = await self._track_control.play(interaction, query=self._selected)
         else:
             await self._track_control.skip(
                 interaction, index=self._data.index(self._selected))
@@ -336,7 +360,10 @@ class MusicPlayerBase:
     def _is_user_allowed(cls):
         async def decorator(interaction: Interaction) -> bool:
             isTrue: bool = True
-            if interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
+            if not interaction.user.voice:
+                await ModularUtil.send_response(interaction, message="Can't do that. \nPlease Join Voice channel first!!", emoji="❌", ephemeral=True)
+                isTrue = False
+            elif interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nPlease join the same Voice Channel with bot!!", emoji="🛑", ephemeral=True)
                 isTrue = False
 
@@ -549,12 +576,12 @@ class MusicPlayer(MusicPlayerBase):
 
         await player.disconnect()
 
-    async def search(self, query: str, source: TrackType = TrackType.YOUTUBE) -> Tuple[Embed, View]:
+    async def search(self, query: str, user: Member, source: TrackType = TrackType.YOUTUBE) -> Tuple[Embed, View]:
         view: View = None
         embed: Embed = None
 
         tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=source, is_search=True)
-        view: SelectView = SelectView(self, data=tracks)
+        view: SelectView = SelectView(self, data=tracks, author=user)
         embed = view.get_embed
 
         return (embed, view)
@@ -639,7 +666,7 @@ class MusicPlayer(MusicPlayerBase):
 
         if index is not None:
             track: Union[Playable, SpotifyTrack] = None
-            
+
             if index < player.queue.count:
                 track = player.queue[index]
                 del player.queue[index]
@@ -661,7 +688,7 @@ class MusicPlayer(MusicPlayerBase):
         embed: Embed = None
 
         view: SelectView = SelectView(
-            self, data=chain(player.queue, player.auto_queue), is_jump_command=True)
+            self, data=chain(player.queue, player.auto_queue), author=interaction.user, is_jump_command=True)
         embed = view.get_embed
 
         return (embed, view)

@@ -178,7 +178,7 @@ class Multimedia(commands.Cog, MusicPlayer):
             ModularBotConst.COLOR['failed']))
 
         try:
-            embed, view = await self.search(query=query, source=source)
+            embed, view = await self.search(query=query, user=interaction.user, source=source)
         except IndexError:
             embed.description = "❌ Track not found, check your keyword"
 

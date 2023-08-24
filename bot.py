@@ -206,6 +206,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         intents.message_content = True
 
         self._praytime_channel: TextChannel = None
+        self._praytimes: dict = None
         self._guild: Guild = None
         self._role: Role = None
 
