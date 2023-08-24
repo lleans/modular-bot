@@ -404,7 +404,7 @@ class MusicPlayerBase:
             if ModularUtil.get_time() >= (key['timestamp'] + timedelta(minutes=self._timeout_minutes)):
                 guild: Guild = self._bot.get_guild(id)
                 voice_client: VoiceClient = guild.voice_client
-                if not voice_client.is_playing():
+                if voice_client and not voice_client.is_playing():
                     await voice_client.disconnect()
                     del self._guild_message[id]
                 else:
