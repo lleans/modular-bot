@@ -17,9 +17,9 @@ from config import GuildRole, ModularBotConst
 
 async def setup(bot: commands.Bot) -> None:
     await wait([
-        bot.add_cog(Administrator(bot)),
-        bot.add_cog(Multimedia(bot)),
-        bot.add_cog(Playground(bot))
+        create_task(bot.add_cog(Administrator(bot))),
+        create_task(bot.add_cog(Multimedia(bot))),
+        create_task(bot.add_cog(Playground(bot)))
     ])
 
     ModularUtil.simple_log("Cog loaded")
@@ -180,7 +180,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         try:
             embed, view = await self.search(query=query, user=interaction.user, source=source)
         except IndexError:
-            embed.description = "❌ Track not found, check your keyword"
+            embed.description = "❌ Track not found, check your keyword or source"
 
         await ModularUtil.send_response(interaction, embed=embed, view=view)
 
@@ -216,7 +216,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         convert_force_play: bool = False
         convert_put_front: bool = False
         track: Union[Playlist, Playable, SpotifyTrack] = None
-        is_playlist = is_queued = is_played = False
+        is_playlist = is_queued = False
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']), description="❌ Track not found")
 
@@ -233,17 +233,16 @@ class Multimedia(commands.Cog, MusicPlayer):
             convert_put_front = True
 
         try:
-            track, is_playlist, is_queued, is_played = await self.play(interaction,
+            track, is_playlist, is_queued = await self.play(interaction,
                                                                     query=query,
                                                                     source=source,
                                                                     autoplay=convert_autoplay,
                                                                     force_play=convert_force_play,
                                                                     put_front=convert_put_front)
 
-            embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_played=is_played, is_put_front=convert_put_front, raw_query=query)
+            embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, raw_query=query)
         except IndexError:
-            embed.color = ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
-            embed.description = "❌ Track not found"
+            pass
 
         await ModularUtil.send_response(interaction, embed=embed)
 
@@ -443,8 +442,8 @@ class Multimedia(commands.Cog, MusicPlayer):
         )
 
         await wait([
-            self.pause(interaction),
-            ModularUtil.send_response(interaction, embed=embed)
+            create_task(self.pause(interaction)),
+            create_task(ModularUtil.send_response(interaction, embed=embed))
         ])
 
     @command(name="resume", description="Resume current track")
