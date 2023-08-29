@@ -6,7 +6,7 @@ from itertools import chain
 from random import choice
 from enum import Enum
 
-from discord import Interaction, VoiceClient, Embed, Message, TextChannel, Guild, VoiceChannel, ButtonStyle, SelectOption, Member
+from discord import Interaction, Embed, Message, TextChannel, VoiceClient, Guild, VoiceChannel, ButtonStyle, SelectOption, Member
 from discord.interactions import Interaction
 from discord.ui import View, Select, button, select
 from discord.errors import NotFound
@@ -45,11 +45,12 @@ class TrackView(View):
 
     async def create_embed(self, interaction: Interaction) -> Embed:
         player: Player = interaction.guild.voice_client
-        track_type: TrackType = TrackType.what_type(player.current.uri)
         self._update_button()
 
         if isinstance(player.current, YouTubeMusicTrack):
             player.current.uri = player.current.uri.replace("www", "music")
+
+        track_type: TrackType = TrackType.what_type(player.current.uri)
 
         embed = Embed(
             title="🎶 Now Playing",
@@ -74,7 +75,7 @@ class TrackView(View):
         try:
             embed: Embed = await self.create_embed(interaction=interaction)
             await interaction.edit_original_response(view=self, embed=embed)
-        except NotFound:
+        except (NotFound, AttributeError):
             pass
 
     async def interaction_check(self, interaction: Interaction) -> bool:
@@ -152,6 +153,7 @@ class SelectView(View):
         embed: Embed = Embed(title="🔍 Here's the result" if not self._is_jump_command else "⏭️ Jump to which track?",
                              description="To play/queue the track, open the dropdown menu and select the desired track. Your track will be played/queued after this",
                              color=ModularUtil.convert_color(ModularBotConst.COLOR['queue']))
+
         return embed
 
     def _pass_data_to_option(self) -> list[SelectOption]:
@@ -173,18 +175,22 @@ class SelectView(View):
     @select(placeholder="🎶 Select your search result!")
     async def _selector(self, interaction: Interaction, select: Select) -> None:
         await interaction.response.defer()
+        player: Player = interaction.guild.voice_client
 
         self._selected = self._data[int(select.values[0])]
         select.disabled = True
         select.placeholder = f"{select.options[int(select.values[0])].emoji} {select.options[int(select.values[0])].label}"
         self._cancel_button.disabled = True
-        await interaction.edit_original_response(view=self)
+        embed: Embed = await self._track_control._play_response(
+            self.author, track=self._selected, is_queued=True if not self._is_jump_command and (player and player.is_playing()) else False, is_put_front=True if self._is_jump_command else False)
 
         if not self._is_jump_command:
             _, _, _ = await self._track_control.play(interaction, query=self._selected)
         else:
             await self._track_control.skip(
                 interaction, index=self._data.index(self._selected))
+
+        await interaction.edit_original_response(view=self, embed=embed)
 
     @button(label="Cancel", emoji="✖️", style=ButtonStyle.red)
     async def _cancel_button(self, interaction: Interaction, _) -> None:
@@ -403,10 +409,9 @@ class MusicPlayerBase:
         for id, key in self._guild_message.items():
             if ModularUtil.get_time() >= (key['timestamp'] + timedelta(minutes=self._timeout_minutes)):
                 guild: Guild = self._bot.get_guild(id)
-                voice_client: VoiceClient = guild.voice_client
-                if voice_client and not voice_client.is_playing():
-                    await voice_client.disconnect()
-                    del self._guild_message[id]
+                client: VoiceClient = guild.voice_client
+                if client and not client.is_playing():
+                    await client.disconnect()
                 else:
                     self._guild_message[id]['timestamp'] = ModularUtil.get_time(
                     )
@@ -479,11 +484,11 @@ class MusicPlayerBase:
 
         return data
 
-    async def _play_response(self, interaction: Interaction, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]], is_playlist: bool, is_queued: bool, is_put_front: bool, raw_query: str = None) -> Embed:
+    async def _play_response(self, member: Member, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]], is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False, raw_query: str = None) -> Embed:
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f'From {member.name} ', icon_url=member.display_avatar)
 
         if is_playlist:
             playlist: Union[Playlist, list[SpotifyTrack]] = track

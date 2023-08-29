@@ -234,13 +234,13 @@ class Multimedia(commands.Cog, MusicPlayer):
 
         try:
             track, is_playlist, is_queued = await self.play(interaction,
-                                                                    query=query,
-                                                                    source=source,
-                                                                    autoplay=convert_autoplay,
-                                                                    force_play=convert_force_play,
-                                                                    put_front=convert_put_front)
+                                                            query=query,
+                                                            source=source,
+                                                            autoplay=convert_autoplay,
+                                                            force_play=convert_force_play,
+                                                            put_front=convert_put_front)
 
-            embed = await self._play_response(interaction, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, raw_query=query)
+            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, raw_query=query)
         except IndexError:
             pass
 
@@ -297,6 +297,7 @@ class Multimedia(commands.Cog, MusicPlayer):
     @MusicPlayerBase._is_user_allowed()
     async def _jump(self, interaction: Interaction) -> None:
         await interaction.response.defer()
+        view: View = View()
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']))
 
