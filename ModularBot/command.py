@@ -167,7 +167,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="search", description="Search your track by query")
-    @describe(query="Track keyword", source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)")
+    @describe(query="Track keyword(You can pass through playlist to pick on it)", source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)")
     @guild_only()
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_user_allowed()

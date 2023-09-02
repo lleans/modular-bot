@@ -588,8 +588,11 @@ class MusicPlayer(MusicPlayerBase):
         view: View = None
         embed: Embed = None
 
+        if query.startswith("http"):
+            source = TrackType.what_type(query)
+
         tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=source, is_search=True)
-        view: SelectView = SelectView(self, user, data=tracks)
+        view: SelectView = SelectView(self, user, data=tracks if not isinstance(tracks, Playlist) else tracks.tracks)
         embed = view.get_embed
 
         return (embed, view)
