@@ -2,9 +2,9 @@ from asyncio import wait, create_task
 from datetime import timedelta
 from typing import Union
 
-from discord import Interaction, Embed, Member, Role, Message
+from discord import Interaction, Embed, Member, Role, Message, TextChannel, Guild
 from discord.ext import commands
-from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, describe, choices, command, guild_only, CheckFailure
+from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, CheckFailure, describe, choices, command, guild_only
 from discord.ui import View
 
 from wavelink import Playable, Player, Playlist, QueueEmpty
@@ -25,6 +25,7 @@ async def setup(bot: commands.Bot) -> None:
     ModularUtil.simple_log("Cog loaded")
 
 
+@guild_only()
 class Administrator(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
@@ -40,7 +41,6 @@ class Administrator(commands.Cog):
         super().__init__()
 
     @command(name='purge', description='To Purge message')
-    @guild_only()
     @checks.has_permissions(manage_messages=True)
     async def _purge(self, interaction: Interaction, amount: int = 1) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -50,7 +50,6 @@ class Administrator(commands.Cog):
         await temp.delete(delay=3)
 
     @checks.has_permissions(administrator=True)
-    @guild_only()
     async def _revoke_magician(self, interaction: Interaction, user: Member):
         await interaction.response.defer(ephemeral=True)
 
@@ -72,7 +71,6 @@ class Administrator(commands.Cog):
         await ModularUtil.send_response(interaction, embed=embed)
 
     @checks.has_permissions(administrator=True)
-    @guild_only()
     async def _revoke_access(self, interaction: Interaction, user: Member):
         await interaction.response.defer(ephemeral=True)
 
@@ -102,6 +100,7 @@ class Administrator(commands.Cog):
         return await super().cog_app_command_error(interaction, error)
 
 
+@guild_only()
 class Playground(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
@@ -113,7 +112,6 @@ class Playground(commands.Cog):
         self._bot.tree.add_command(self.ctx_menu)
         super().__init__()
 
-    @guild_only()
     async def _avatar(self, interaction: Interaction, user: Member):
         await interaction.response.defer(ephemeral=True)
 
@@ -133,6 +131,7 @@ class Playground(commands.Cog):
         return await super().cog_app_command_error(interaction, error)
 
 
+@guild_only()
 class Multimedia(commands.Cog, MusicPlayer):
 
     def __init__(self, bot: commands.Bot) -> None:
@@ -144,8 +143,18 @@ class Multimedia(commands.Cog, MusicPlayer):
         if not self._timeout_check.is_running():
             self._timeout_check.start()
 
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        channel: TextChannel = interaction.channel
+        guild: Guild = interaction.guild
+
+        if interaction.command in (self._join, self._play, self._search):
+            self._record_timestamp(guild_id=guild.id,
+                                   channel=channel.id,
+                                   interaction=interaction)
+
+        return super().interaction_check(interaction)
+
     @command(name="join", description="Join an voice channel")
-    @guild_only()
     @MusicPlayerBase._is_user_join_checker()
     async def _join(self, interaction: Interaction) -> None:
         await wait([
@@ -155,7 +164,6 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="leave", description="Leave the voice channel")
-    @guild_only()
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
@@ -168,7 +176,6 @@ class Multimedia(commands.Cog, MusicPlayer):
 
     @command(name="search", description="Search your track by query")
     @describe(query="Track keyword(You can pass through playlist to pick on it)", source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)")
-    @guild_only()
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_user_allowed()
     async def _search(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE) -> None:
@@ -199,7 +206,6 @@ class Multimedia(commands.Cog, MusicPlayer):
         put_front=[
         Choice(name='True', value=1),
         Choice(name='False', value=0)])
-    @guild_only()
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_user_allowed()
     async def _play(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE, autoplay: Choice[int] = 0, force_play: Choice[int] = 0, put_front: Choice[int] = 0) -> None:
@@ -240,7 +246,7 @@ class Multimedia(commands.Cog, MusicPlayer):
                                                             force_play=convert_force_play,
                                                             put_front=convert_put_front)
 
-            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, raw_query=query)
+            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front)
         except IndexError:
             pass
 
@@ -251,9 +257,9 @@ class Multimedia(commands.Cog, MusicPlayer):
     @choices(is_history=[
         Choice(name='True', value=1),
         Choice(name='False', value=0)])
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _queue(self, interaction: Interaction, is_history: Choice[int] = 0) -> None:
         await interaction.response.defer(ephemeral=True)
 
@@ -276,9 +282,9 @@ class Multimedia(commands.Cog, MusicPlayer):
         await ModularUtil.send_response(interaction, embed=embed, view=view)
 
     @command(name="skip", description="Skip current track")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _skip(self, interaction: Interaction) -> None:
         await interaction.response.defer()
         embed: Embed = Embed(
@@ -292,9 +298,9 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="jump", description="Jump on specific music(Put selected track into front)")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _jump(self, interaction: Interaction) -> None:
         await interaction.response.defer()
         view: View = View()
@@ -306,12 +312,14 @@ class Multimedia(commands.Cog, MusicPlayer):
         except IndexError:
             embed.description = "📪 Queue is empty"
 
-        await ModularUtil.send_response(interaction, embed=embed, view=view)
+        await wait([
+            create_task(ModularUtil.send_response(interaction, embed=embed, view=view))
+        ])
 
     @command(name="previous", description="Play previous track(All queue still saved)")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _previous(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -325,10 +333,11 @@ class Multimedia(commands.Cog, MusicPlayer):
         if not was_allowed:
             embed.description = "📪 History is empty"
 
-        await ModularUtil.send_response(interaction, embed=embed)
+        await wait([
+            create_task(ModularUtil.send_response(interaction, embed=embed))
+        ])
 
     @command(name="stop", description="Stop anything(This will reset player back to initial state)")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
     @MusicPlayerBase._is_playing()
@@ -346,9 +355,9 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="clear", description="Clear current queue(This will also disable Autoplay and any loop state)")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _clear(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -361,9 +370,9 @@ class Multimedia(commands.Cog, MusicPlayer):
         await ModularUtil.send_response(interaction, embed=embed)
 
     @command(name="shuffle", description="Shuffle current queue")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _shuffle(self, interaction: Interaction) -> None:
         await interaction.response.defer()
 
@@ -373,10 +382,12 @@ class Multimedia(commands.Cog, MusicPlayer):
         )
 
         self.shuffle(interaction)
-        await ModularUtil.send_response(interaction, embed=embed)
+        await wait([
+            create_task(ModularUtil.send_response(interaction, embed=embed)),
+            create_task(self._update_player(interaction=interaction))
+        ])
 
     @command(name="now_playing", description="Show current playing track")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
     @MusicPlayerBase._is_playing()
@@ -401,7 +412,6 @@ class Multimedia(commands.Cog, MusicPlayer):
     @choices(is_queue=[
         Choice(name='True', value=1),
         Choice(name='False', value=0)])
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
     @MusicPlayerBase._is_playing()
@@ -427,10 +437,12 @@ class Multimedia(commands.Cog, MusicPlayer):
         else:
             embed.description = "✅ Loop Queue" if loop else "✅ Unloop Queue"
 
-        await ModularUtil.send_response(interaction, embed=embed)
+        await wait([
+            create_task(ModularUtil.send_response(interaction, embed=embed)),
+            create_task(self._update_player(interaction=interaction))
+        ])
 
     @command(name="pause", description="Pause current track")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
     @MusicPlayerBase._is_playing()
@@ -444,13 +456,14 @@ class Multimedia(commands.Cog, MusicPlayer):
 
         await wait([
             create_task(self.pause(interaction)),
-            create_task(ModularUtil.send_response(interaction, embed=embed))
+            create_task(ModularUtil.send_response(interaction, embed=embed)),
+            create_task(self._update_player(interaction=interaction))
         ])
 
     @command(name="resume", description="Resume current track")
-    @guild_only()
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
+    @MusicPlayerBase._is_playing()
     async def _resume(self, interaction: Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
 
@@ -464,7 +477,10 @@ class Multimedia(commands.Cog, MusicPlayer):
         if not res:
             return await ModularUtil.send_response(interaction, message="Nothing is paused", emoji="📭")
 
-        await ModularUtil.send_response(interaction, embed=embed)
+        await wait([
+            create_task(ModularUtil.send_response(interaction, embed=embed)),
+            create_task(self._update_player(interaction=interaction))
+        ])
 
     async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
         if not isinstance(error, CheckFailure):

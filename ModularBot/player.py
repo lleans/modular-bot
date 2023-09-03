@@ -17,7 +17,7 @@ from wavelink import Node, TrackEventPayload, WebsocketClosedPayload, QueueEmpty
 from wavelink.player import Player
 from wavelink.tracks import YouTubePlaylist, YouTubeTrack, YouTubeMusicTrack, SoundCloudPlaylist, SoundCloudTrack, Playlist, Playable
 from wavelink.node import Node, NodePool
-from wavelink.ext.spotify import decode_url, SpotifyTrack, SpotifySearchType, SpotifyClient, SpotifyRequestError, SpotifyDecodePayload, BASEURL
+from wavelink.ext.spotify import SpotifyTrack, SpotifyClient, SpotifyRequestError, BASEURL
 
 from .util import ModularUtil
 from config import ModularBotConst
@@ -105,10 +105,9 @@ class TrackView(View):
     @button(label="Previous", emoji="⏮️", style=ButtonStyle.secondary)
     async def _previous(self, interaction: Interaction, _) -> None:
         await interaction.response.defer()
-        await self._update_message(interaction)
         await self._track_control.previous(interaction)
 
-    @button(label="Pause", emoji="⏸️", style=ButtonStyle.blurple, custom_id="play_button")
+    @button(label="Pause", emoji="⏸️", style=ButtonStyle.blurple)
     async def _pause(self, interaction: Interaction, _) -> None:
         await interaction.response.defer()
 
@@ -124,7 +123,6 @@ class TrackView(View):
     async def _next(self, interaction: Interaction, _) -> None:
         await interaction.response.defer()
         await self._track_control.skip(interaction)
-        await self._update_message(interaction)
 
     @button(label="Loop", emoji="🔁", style=ButtonStyle.green)
     async def _loop(self, interaction: Interaction, _) -> None:
@@ -137,8 +135,11 @@ class TrackView(View):
 
 class SelectView(View):
 
+    SHOW_LIMIT = 25
+
     def __init__(self, control, author: Member, /, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, *, timeout: float | None = 180):
-        self._data: list[Union[Playable, SpotifyTrack]] = list(data)
+        self._data: list[Union[Playable, SpotifyTrack]] = list(data)[
+            0:self.SHOW_LIMIT]
         self._track_control: MusicPlayer = control
         self.author: Member = author
         self._selected: Union[Playable, SpotifyTrack] = None
@@ -156,13 +157,14 @@ class SelectView(View):
 
         return embed
 
-    def _pass_data_to_option(self) -> list[SelectOption]:
+    def _pass_data_to_option(self) -> None:
         if not self._data:
             raise IndexError
 
         for index, track in enumerate(self._data):
             self._selector.options.append(SelectOption(
-                label=track.title, description=f"{track.author} - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))
+                label=track.title, description=f"{track.author if not isinstance(track, SpotifyTrack) else ', '.join(track.artists)}\
+                      - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         isTrue: bool = True
@@ -178,11 +180,8 @@ class SelectView(View):
         player: Player = interaction.guild.voice_client
 
         self._selected = self._data[int(select.values[0])]
-        select.disabled = True
-        select.placeholder = f"{select.options[int(select.values[0])].emoji} {select.options[int(select.values[0])].label}"
-        self._cancel_button.disabled = True
         embed: Embed = await self._track_control._play_response(
-            self.author, track=self._selected, is_queued=True if not self._is_jump_command and (player and player.is_playing()) else False, is_put_front=True if self._is_jump_command else False)
+            self.author, track=self._selected, is_queued=True if player and player.is_playing() else False, is_put_front=True if self._is_jump_command else False)
 
         if not self._is_jump_command:
             _, _, _ = await self._track_control.play(interaction, query=self._selected)
@@ -190,7 +189,7 @@ class SelectView(View):
             await self._track_control.skip(
                 interaction, index=self._data.index(self._selected))
 
-        await interaction.edit_original_response(view=self, embed=embed)
+        await interaction.edit_original_response(view=None, embed=embed)
 
     @button(label="Cancel", emoji="✖️", style=ButtonStyle.red)
     async def _cancel_button(self, interaction: Interaction, _) -> None:
@@ -207,18 +206,6 @@ class QueueView(View):
         self._is_history: bool = is_history
 
         super().__init__(timeout=timeout)
-
-    @property
-    def _is_first_page_disabled(self) -> bool:
-        if self._current_page == 1:
-            return True
-        return False
-
-    @property
-    def _is_last_page_disabled(self) -> bool:
-        if self._current_page == int(len(self._data) / self._limit_show) + 1:
-            return True
-        return False
 
     @property
     def get_embed(self) -> Embed:
@@ -255,13 +242,13 @@ class QueueView(View):
 
     def _update_buttons(self):
         if self._current_page == 1:
-            self._first_page_button.disabled = True
             self._prev_button.disabled = True
+            self._first_page_button.disabled = True
         else:
-            self._first_page_button.disabled = False
             self._prev_button.disabled = False
+            self._first_page_button.disabled = False
 
-        if self._current_page == int(len(self._data) / self._limit_show) + 1:
+        if self._current_page == (len(self._data) + self._limit_show - 1) // self._limit_show:
             self._next_button.disabled = True
             self._last_page_button.disabled = True
         else:
@@ -276,7 +263,6 @@ class QueueView(View):
     async def _first_page_button(self, interaction: Interaction, _) -> None:
         await interaction.response.defer()
         self._current_page = 1
-
         await self._update_message(interaction)
 
     @button(label="<", style=ButtonStyle.blurple)
@@ -394,7 +380,7 @@ class MusicPlayerBase:
         async def decorator(interaction: Interaction) -> bool:
             isTrue: bool = True
             player: Player = interaction.guild.voice_client
-            if player and not player.is_playing():
+            if player and player.current is None:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nNothing is playing", emoji="📪")
                 isTrue = False
 
@@ -432,12 +418,10 @@ class MusicPlayerBase:
         tracks: Union[Playable, Playlist,
                       SpotifyTrack, list[SpotifyTrack]] = None
         search_limit: int = 30
-        track_type_spotify: SpotifySearchType = SpotifySearchType.track
 
         if track_type in (TrackType.YOUTUBE, TrackType.YOUTUBE_MUSIC):
             if 'playlist?' in query:
                 tracks: YouTubePlaylist = await YouTubePlaylist.search(query)
-                setattr(tracks, "uri", query)
             elif track_type is TrackType.YOUTUBE_MUSIC:
                 tracks: YouTubeMusicTrack = await YouTubeMusicTrack.search(query)
             else:
@@ -445,63 +429,73 @@ class MusicPlayerBase:
         elif track_type is TrackType.SOUNCLOUD:
             if 'sc-playlists' in query:
                 tracks: SoundCloudPlaylist = await SoundCloudPlaylist.search(query)
-                setattr(tracks, "uri", query)
             else:
                 tracks: SoundCloudTrack = await SoundCloudTrack.search(query)
         elif track_type is TrackType.SPOTIFY:
             if 'http' in query:
-                track_type_spotify: SpotifySearchType = decode_url(query).type
                 tracks: list[SpotifyTrack] = await SpotifyTrack.search(query)
             else:
                 tracks: YouTubeTrack = await YouTubeTrack.search(query)
 
-        if is_search:
+        if isinstance(tracks, Playlist):
+            setattr(tracks, "uri", query)
+        elif is_search:
             tracks = tracks[0:search_limit]
-        elif not isinstance(tracks, Playlist) and track_type_spotify is SpotifySearchType.track:
+        else:
             tracks = tracks[0]
 
         return tracks
 
-    async def _get_raw_spotify(self, uri: str) -> dict:
+    async def _get_raw_spotify(self, uri: str, is_playlist: bool = False) -> dict:
         node: Node = NodePool.get_connected_node()
-        decoded: SpotifyDecodePayload = decode_url(uri)
-        sp_client: SpotifyClient = node._spotify
-        if sp_client.is_token_expired():
-            await sp_client._get_bearer_token()
+        openable_link: str = "https://open.spotify.com/{track_type}/{id}"
+        uri_split: list[str] = uri.split(":")
+        id: str = uri_split[2]
+        track_type: str = uri_split[1]
+
         data: dict = dict()
 
-        uri = BASEURL.format(entity=decoded.type.name, identifier=decoded.id)
+        if is_playlist:
+            sp_client: SpotifyClient = node._spotify
+            if sp_client.is_token_expired():
+                await sp_client._get_bearer_token()
 
-        async with self._bot.session.get(uri, headers=sp_client.bearer_headers) as resp:
-            if resp.status == 400:
-                return None
+            uri = BASEURL.format(entity=track_type, identifier=id)
 
-            elif resp.status != 200:
-                raise SpotifyRequestError(resp.status, resp.reason)
+            async with self._bot.session.get(uri, headers=sp_client.bearer_headers) as resp:
+                if resp.status == 400:
+                    return None
 
-            data = await resp.json()
-            data.pop("tracks",  None)
+                elif resp.status != 200:
+                    raise SpotifyRequestError(resp.status, resp.reason)
+
+                data = await resp.json()
+                data.pop("tracks",  None)
+
+        data['uri'] = openable_link.format(track_type=track_type, id=id)
 
         return data
 
-    async def _play_response(self, member: Member, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]], is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False, raw_query: str = None) -> Embed:
+    async def _play_response(self, member: Member, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]],
+                             is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False) -> Embed:
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
         embed.set_footer(
             text=f'From {member.name} ', icon_url=member.display_avatar)
 
+        raw_data_spotify: dict = dict()
+
+        if isinstance(track, (list, SpotifyTrack)):
+            raw_data_spotify = await self._get_raw_spotify(track.uri, is_playlist=True if isinstance(track, list) else False)
+
         if is_playlist:
             playlist: Union[Playlist, list[SpotifyTrack]] = track
-            raw_data_spotify: dict = dict()
-
-            if raw_query is not None and isinstance(playlist, list):
-                raw_data_spotify = await self._get_raw_spotify(raw_query)
-
-            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - {len(playlist.tracks)  if not isinstance(playlist, list) else len(playlist)} tracks from ** [{playlist.name if not isinstance(playlist, list) else raw_data_spotify['name']}]({playlist.uri if not isinstance(playlist, list) else raw_query})**"
+            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - {len(playlist.tracks)  if not isinstance(playlist, list) else len(playlist)} \
+            tracks from ** [{playlist.name if not isinstance(playlist, list) else raw_data_spotify['name']}]({playlist.uri if not isinstance(playlist, list) else raw_data_spotify['uri']})**"
         elif is_queued:
-            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''}- **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_query})**"
+            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_data_spotify['uri']})**"
         else:
-            embed.description = f"🎶 Playing - **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_query})**"
+            embed.description = f"🎶 Playing - **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_data_spotify['uri']})**"
 
         return embed
 
@@ -529,6 +523,23 @@ class MusicPlayerBase:
             self._guild_message[guild_id]['channel'])
         message: Message = await channel.fetch_message(self._guild_message[guild_id]['message'])
         await message.delete()
+
+    async def _update_player(self, interaction: Interaction) -> None:
+        channel: TextChannel = interaction.channel
+        guild: Guild = interaction.guild
+
+        player: Player = guild.voice_client
+        if player and (player.is_playing() or player.is_paused()):
+            channel: TextChannel = self._bot.get_channel(
+                self._guild_message[guild.id]['channel'])
+            message: Message = await channel.fetch_message(self._guild_message[guild.id]['message'])
+
+            view: TrackView = TrackView(self, player=player)
+            embed: Embed = await view.create_embed(interaction=interaction)
+
+            await message.edit(embed=embed, view=view)
+
+        return True
 
     # Event handling
 
@@ -573,9 +584,6 @@ class MusicPlayer(MusicPlayerBase):
 
     async def join(self, interaction: Interaction) -> None:
         channel:  VoiceChannel = interaction.user.voice.channel
-        self._record_timestamp(guild_id=interaction.guild_id,
-                               channel=interaction.channel_id,
-                               interaction=interaction)
 
         await channel.connect(cls=Player)
 
@@ -592,12 +600,14 @@ class MusicPlayer(MusicPlayerBase):
             source = TrackType.what_type(query)
 
         tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=source, is_search=True)
-        view: SelectView = SelectView(self, user, data=tracks if not isinstance(tracks, Playlist) else tracks.tracks)
+        view: SelectView = SelectView(self, user, data=tracks if not isinstance(
+            tracks, Playlist) else tracks.tracks)
         embed = view.get_embed
 
         return (embed, view)
 
-    async def play(self, interaction: Interaction, /, query: Union[str, Playable, SpotifyTrack], source: TrackType = TrackType.YOUTUBE, autoplay: bool = None, force_play: bool = False, put_front: bool = False) -> Tuple[Union[Playable, Playlist, SpotifyTrack], bool, bool]:
+    async def play(self, interaction: Interaction, /, query: Union[str, Playable, SpotifyTrack], source: TrackType = TrackType.YOUTUBE,
+                   autoplay: bool = None, force_play: bool = False, put_front: bool = False) -> Tuple[Union[Playable, Playlist, SpotifyTrack], bool, bool]:
         is_playlist = is_queued = False
         player: Player = None
 
@@ -607,16 +617,12 @@ class MusicPlayer(MusicPlayerBase):
             player = interaction.user.guild.voice_client
 
         track_type: TrackType = (TrackType.what_type(
-            uri=query) if not isinstance(query, Playable) else None) or source
+            uri=query) if not isinstance(query, (Playable, SpotifyTrack)) else None) or source
 
         if not isinstance(query, (Playable, SpotifyTrack)):
             tracks: Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]] = await self._custom_wavelink_player(query=query, track_type=track_type)
         else:
             tracks = query
-
-        self._record_timestamp(guild_id=interaction.guild_id,
-                               channel=interaction.channel_id,
-                               interaction=interaction)
 
         if autoplay is None:
             player.autoplay = player.autoplay
