@@ -144,12 +144,8 @@ class Multimedia(commands.Cog, MusicPlayer):
             self._timeout_check.start()
 
     async def interaction_check(self, interaction: Interaction) -> bool:
-        channel: TextChannel = interaction.channel
-        guild: Guild = interaction.guild
-
-        if interaction.command in (self._join, self._play, self._search):
-            self._record_timestamp(guild_id=guild.id,
-                                   channel=channel.id,
+        if interaction.command is not (self._queue):
+            self._record_timestamp(guild_id=interaction.guild_id,
                                    interaction=interaction)
 
         return super().interaction_check(interaction)
@@ -175,17 +171,32 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="search", description="Search your track by query")
-    @describe(query="Track keyword(You can pass through playlist to pick on it)", source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)")
+    @describe(query="Track keyword(You can pass through playlist to pick on it)", 
+              source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)",
+              autoplay="Autoplay recomendation from you've been played(Soundcloud not supported)")
+    @choices(autoplay=[
+        Choice(name='True', value=1),
+        Choice(name='False', value=0)])
     @MusicPlayerBase._is_user_join_checker()
     @MusicPlayerBase._is_user_allowed()
-    async def _search(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE) -> None:
+    async def _search(self, interaction: Interaction, query: str, source: TrackType = TrackType.YOUTUBE, autoplay: Choice[int] = 0) -> None:
         await interaction.response.defer()
+        convert_autoplay: bool = False
         view: View = View()
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']))
+        
+        autoplay = Choice(
+            name="None", value=None) if autoplay == 0 else autoplay
+        
+        if autoplay.value == None:
+            convert_autoplay = None
+
+        if autoplay.value == 1:
+            convert_autoplay = True
 
         try:
-            embed, view = await self.search(query=query, user=interaction.user, source=source)
+            embed, view = await self.search(query=query, user=interaction.user, source=source, autoplay=convert_autoplay)
         except IndexError:
             embed.description = "❌ Track not found, check your keyword or source"
 
@@ -246,7 +257,7 @@ class Multimedia(commands.Cog, MusicPlayer):
                                                             force_play=convert_force_play,
                                                             put_front=convert_put_front)
 
-            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front)
+            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, is_autoplay=convert_autoplay)
         except IndexError:
             pass
 
@@ -384,7 +395,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         self.shuffle(interaction)
         await wait([
             create_task(ModularUtil.send_response(interaction, embed=embed)),
-            create_task(self._update_player(interaction=interaction))
+            create_task(self._update_player(guild_id=interaction.guild_id))
         ])
 
     @command(name="now_playing", description="Show current playing track")
@@ -439,7 +450,7 @@ class Multimedia(commands.Cog, MusicPlayer):
 
         await wait([
             create_task(ModularUtil.send_response(interaction, embed=embed)),
-            create_task(self._update_player(interaction=interaction))
+            create_task(self._update_player(guild_id=interaction.guild_id))
         ])
 
     @command(name="pause", description="Pause current track")
@@ -457,7 +468,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         await wait([
             create_task(self.pause(interaction)),
             create_task(ModularUtil.send_response(interaction, embed=embed)),
-            create_task(self._update_player(interaction=interaction))
+            create_task(self._update_player(guild_id=interaction.guild_id))
         ])
 
     @command(name="resume", description="Resume current track")
@@ -479,7 +490,7 @@ class Multimedia(commands.Cog, MusicPlayer):
 
         await wait([
             create_task(ModularUtil.send_response(interaction, embed=embed)),
-            create_task(self._update_player(interaction=interaction))
+            create_task(self._update_player(guild_id=interaction.guild_id))
         ])
 
     async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
