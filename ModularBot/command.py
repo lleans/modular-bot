@@ -2,7 +2,7 @@ from asyncio import wait, create_task
 from datetime import timedelta
 from typing import Union
 
-from discord import Interaction, Embed, Member, Role, Message, TextChannel, Guild
+from discord import Interaction, Embed, Member, Role, Message
 from discord.ext import commands
 from discord.app_commands import ContextMenu, checks, Choice, AppCommandError, MissingPermissions, CheckFailure, describe, choices, command, guild_only
 from discord.ui import View
@@ -257,7 +257,7 @@ class Multimedia(commands.Cog, MusicPlayer):
                                                             force_play=convert_force_play,
                                                             put_front=convert_put_front)
 
-            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, is_autoplay=convert_autoplay)
+            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, is_autoplay=convert_autoplay, raw_uri=query)
         except IndexError:
             pass
 

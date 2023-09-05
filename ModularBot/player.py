@@ -1,7 +1,7 @@
 
 from datetime import timedelta
 from asyncio import wait, create_task
-from typing import Union, Tuple
+from typing import Any, Union, Tuple
 from itertools import chain
 from random import choice
 from enum import Enum
@@ -17,10 +17,18 @@ from wavelink import Node, TrackEventPayload, WebsocketClosedPayload, QueueEmpty
 from wavelink.player import Player
 from wavelink.tracks import YouTubePlaylist, YouTubeTrack, YouTubeMusicTrack, SoundCloudPlaylist, SoundCloudTrack, Playlist, Playable
 from wavelink.node import Node, NodePool
-from wavelink.ext.spotify import SpotifyTrack, SpotifyClient, SpotifyRequestError, BASEURL
+from wavelink.ext.spotify import SpotifyTrack, SpotifyClient, SpotifyRequestError, SpotifySearchType, SpotifyDecodePayload, decode_url,  BASEURL
+from wavelink.types.track import Track as TrackPayload
 
 from .util import ModularUtil
 from config import ModularBotConst
+
+
+class CustomYoutubeMusic(YouTubeMusicTrack):
+
+    def __init__(self, data: TrackPayload) -> None:
+        super().__init__(data)
+        self.uri = self.uri.replace('www', 'music')
 
 
 class TrackView(View):
@@ -47,10 +55,6 @@ class TrackView(View):
         interaction: Interaction = self._track_control._guild_message[
             self._player.guild.id]['interaction']
         self._update_button()
-
-        if self._player.current.PREFIX == YouTubeMusicTrack.PREFIX:
-            self._player.current.uri = self._player.current.uri.replace(
-                "www", "music")
 
         track_type: TrackType = TrackType.what_type(self._player.current.uri)
 
@@ -165,7 +169,8 @@ class SelectView(View):
         self._selected: Union[Playable, SpotifyTrack] = None
         self._is_jump_command: bool = is_jump_command
         self._autoplay: bool = autoplay
-        self.rand_emoji: list(str) = ["🎼", "🎵", "🎶", "🎸", "🎷", "🎺", "🎹"]
+        self.rand_emoji: list(
+            str) = ["🎼", "🎵", "🎶", "🎸", "🎷", "🎺", "🎹", "🥁", "🪕", "🎻"]
 
         super().__init__(timeout=timeout)
 
@@ -183,8 +188,11 @@ class SelectView(View):
             raise IndexError
 
         for index, track in enumerate(self._data):
+            if isinstance(track, SpotifyTrack):
+                track = MusicPlayerBase._spotify_patcher(track)
+
             self._selector.options.append(SelectOption(
-                label=track.title, description=f"{track.author if not isinstance(track, SpotifyTrack) else ', '.join(track.artists)}\
+                label=track.title, description=f"{track.author if not isinstance(track, SpotifyTrack) else track.artists}\
                       - {MusicPlayerBase._parseSec(track.duration)}", emoji=choice(self.rand_emoji), value=str(index)))
 
     async def interaction_check(self, interaction: Interaction) -> bool:
@@ -222,6 +230,10 @@ class QueueView(View):
 
     def __init__(self, queue: Union[chain, BaseQueue], is_history: bool = False, *, timeout: float | None = 180):
         self._data: list[Union[Playable, SpotifyTrack]] = list(queue)
+        for x in self._data:
+            if isinstance(x, SpotifyTrack):
+                x = MusicPlayerBase._spotify_patcher(x)
+
         self._current_page: int = 1
         self._limit_show: int = 10
         self._is_history: bool = is_history
@@ -246,7 +258,6 @@ class QueueView(View):
 
         for track in data:
             count += 1
-            track: Playable = track
             embed.description += f"{count}. **[{track.title}]({track.uri})** - {MusicPlayerBase._parseSec(track.duration)}\n"
 
         return embed
@@ -432,51 +443,85 @@ class MusicPlayerBase:
             return f'{h:d}h {m:02d}m {s:02d}s'
         else:
             return f'{m:02d}m {s:02d}s'
+        
+    @classmethod
+    def _spotify_patcher(cls, child: SpotifyTrack) -> SpotifyTrack:
+
+        def _spotify_link_fixed(uri: str) -> str:
+            openable_link: str = "https://open.spotify.com/{track_type}/{id}"
+            uri_split: list[str] = uri.split(":")
+            id: str = uri_split[2]
+            track_type: str = uri_split[1]
+
+            return openable_link.format(track_type=track_type, id=id)
+
+        if not "//" in child.uri:
+            child.uri = _spotify_link_fixed(child.uri)
+            child.artists = ', '.join(child.artists)
+
+        return child
 
     @staticmethod
     async def _custom_wavelink_player(query: str, track_type: TrackType, is_search: bool = False) -> Union[Playable, Playlist, SpotifyTrack, list[SpotifyTrack]]:
-        """Will reeturn either List of tracks or Single Tracks"""
+        """Will return either List of tracks or Single Tracks"""
         tracks: Union[Playable, Playlist,
-                      SpotifyTrack, list[SpotifyTrack]] = None
+                      SpotifyTrack, list[SpotifyTrack]] = list()
+        is_playlist: bool = False
         search_limit: int = 30
 
         if track_type in (TrackType.YOUTUBE, TrackType.YOUTUBE_MUSIC):
             if 'playlist?' in query:
+                is_playlist = True
                 tracks: YouTubePlaylist = await YouTubePlaylist.search(query)
-            elif track_type is TrackType.YOUTUBE_MUSIC:
-                tracks: YouTubeMusicTrack = await YouTubeMusicTrack.search(query)
+
+            if track_type is TrackType.YOUTUBE_MUSIC:
+                if is_playlist:
+                    tracks.tracks = [CustomYoutubeMusic(
+                        data=trck.data) for trck in tracks.tracks]
+                else:
+                    tracks: CustomYoutubeMusic = CustomYoutubeMusic.search(
+                        query)
             else:
                 tracks: YouTubeTrack = await YouTubeTrack.search(query)
         elif track_type is TrackType.SOUNCLOUD:
             if 'sc-playlists' in query:
+                is_playlist = True
                 tracks: SoundCloudPlaylist = await SoundCloudPlaylist.search(query)
             else:
                 tracks: SoundCloudTrack = await SoundCloudTrack.search(query)
         elif track_type is TrackType.SPOTIFY:
             if 'http' in query:
+                track_type_spotify: SpotifySearchType = decode_url(query).type
+                is_playlist = True if track_type_spotify in (
+                    SpotifySearchType.album, SpotifySearchType.playlist) else False
                 tracks: list[SpotifyTrack] = await SpotifyTrack.search(query)
             else:
                 tracks: YouTubeTrack = await YouTubeTrack.search(query)
 
-        if isinstance(tracks, Playlist):
-            setattr(tracks, "uri", query)
-        elif is_search:
+        if is_search:
             tracks = tracks[0:search_limit]
-        else:
+        elif not is_playlist:
             tracks = tracks[0]
 
         return tracks
 
-    async def _get_raw_spotify(self, uri: str, is_playlist: bool = False) -> dict:
-        node: Node = NodePool.get_connected_node()
-        openable_link: str = "https://open.spotify.com/{track_type}/{id}"
-        uri_split: list[str] = uri.split(":")
-        id: str = uri_split[2]
-        track_type: str = uri_split[1]
+    async def _play_response(self, member: Member, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]],
+                             is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False, is_autoplay: bool = False, raw_uri: str = None) -> Embed:
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
+        embed.set_footer(
+            text=f'From {member.name} ', icon_url=member.display_avatar)
 
-        data: dict = dict()
+        if isinstance(track, SpotifyTrack):
+            track = self._spotify_patcher(track)
 
-        if is_playlist:
+        async def _get_raw_spotify_playlist(uri_ori: str) -> dict:
+            node: Node = NodePool.get_connected_node()
+            decoded: SpotifyDecodePayload = decode_url(url=uri_ori)
+            id: str = decoded.id
+            track_type: str = decoded.type.name
+            data: dict = dict()
+
             sp_client: SpotifyClient = node._spotify
             if sp_client.is_token_expired():
                 await sp_client._get_bearer_token()
@@ -486,41 +531,29 @@ class MusicPlayerBase:
             async with self._bot.session.get(uri, headers=sp_client.bearer_headers) as resp:
                 if resp.status == 400:
                     return None
-
                 elif resp.status != 200:
                     raise SpotifyRequestError(resp.status, resp.reason)
 
                 data = await resp.json()
                 data.pop("tracks",  None)
 
-        data['uri'] = openable_link.format(track_type=track_type, id=id)
+            data['uri'] = uri_ori
 
-        return data
-
-    async def _play_response(self, member: Member, /, track: Union[Playlist, Playable, SpotifyTrack, list[SpotifyTrack]],
-                             is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False, is_autoplay: bool = False) -> Embed:
-        embed: Embed = Embed(color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
-        embed.set_footer(
-            text=f'From {member.name} ', icon_url=member.display_avatar)
-
-        if track.PREFIX == YouTubeMusicTrack.PREFIX:
-            track.uri = track.uri.replace(
-                "www", "music")
+            return data
 
         raw_data_spotify: dict = dict()
 
-        if isinstance(track, (list, SpotifyTrack)):
-            raw_data_spotify = await self._get_raw_spotify(track.uri, is_playlist=True if isinstance(track, list) else False)
+        if raw_uri and isinstance(track, list):
+            raw_data_spotify = await _get_raw_spotify_playlist(raw_uri)
 
         if is_playlist:
             playlist: Union[Playlist, list[SpotifyTrack]] = track
             embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - {len(playlist.tracks)  if not isinstance(playlist, list) else len(playlist)} \
-            tracks from ** [{playlist.name if not isinstance(playlist, list) else raw_data_spotify['name']}]({playlist.uri if not isinstance(playlist, list) else raw_data_spotify['uri']})**"
+            tracks from ** [{playlist.name if not isinstance(playlist, list) else raw_data_spotify['name']}]({raw_uri if not isinstance(playlist, list) else raw_data_spotify['uri']})**"
         elif is_queued:
-            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_data_spotify['uri']})**"
+            embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - **[{track.title}]({track.uri})**"
         else:
-            embed.description = f"🎶 Playing - **[{track.title}]({track.uri if not isinstance(track, SpotifyTrack) else raw_data_spotify['uri']})**"
+            embed.description = f"🎶 Playing - **[{track.title}]({track.uri})**"
 
         if is_autoplay:
             embed.description += " - Autoplay"
@@ -584,7 +617,9 @@ class MusicPlayerBase:
         await self._clear_message(player.guild.id)
 
         if not player.autoplay and not player.queue.is_empty:
-            track: Union[Playable, SpotifyTrack] = await player.queue.get_wait()
+            track: Playable | SpotifyTrack = await player.queue.get_wait()
+            if isinstance(track, SpotifyTrack):
+                track = await track.fulfill(player=player, cls=CustomYoutubeMusic, populate=player.autoplay)
             await player.play(track=track)
 
     @commands.Cog.listener()
@@ -663,6 +698,9 @@ class MusicPlayer(MusicPlayerBase):
 
             if not player.is_playing():
                 trck: Union[Playable, SpotifyTrack] = await player.queue.get_wait()
+                if isinstance(trck, SpotifyTrack):
+                    trck = await trck.fulfill(
+                        player=player, cls=CustomYoutubeMusic, populate=False)
                 await player.play(trck)
 
             is_playlist = True
@@ -679,7 +717,11 @@ class MusicPlayer(MusicPlayerBase):
 
             is_queued = True
         else:
-            await player.play(tracks, populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
+            trck = tracks
+            if isinstance(trck, SpotifyTrack):
+                trck = await trck.fulfill(player=player, cls=CustomYoutubeMusic,
+                                              populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
+            await player.play(trck, populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
 
         return (tracks, is_playlist, is_queued)
 
@@ -772,7 +814,7 @@ class MusicPlayer(MusicPlayerBase):
     def now_playing(self, interaction: Interaction) -> Tuple[Player, int]:
         player: Player = interaction.user.guild.voice_client
 
-        time: int = player.current.duration - player.position
+        time: int = (player.current.duration - player.position)//1000
 
         return (player, time)
 
