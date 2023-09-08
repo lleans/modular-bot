@@ -470,9 +470,6 @@ class MusicPlayerBase:
         search_limit: int = 30
 
         if track_type in (TrackType.YOUTUBE, TrackType.YOUTUBE_MUSIC):
-            if 'playlist?' in query:
-                is_playlist = True
-                tracks: YouTubePlaylist = await YouTubePlaylist.search(query)
 
             if track_type is TrackType.YOUTUBE_MUSIC:
                 if is_playlist:
