@@ -2,7 +2,6 @@ from asyncio import sleep, wait, create_task
 from io import BytesIO
 from re import search, IGNORECASE
 from random import choice
-from typing import Union, List
 
 from datetime import timedelta, datetime
 from discord.ext import commands, tasks
@@ -89,7 +88,7 @@ class ModularBotTask:
             time: datetime = ModularUtil.get_time()
 
             if self._is_ramadhan:
-                is_praytime: Union[Embed, None] = Prayers.prayers_generator(
+                is_praytime: Embed | None = Prayers.prayers_generator(
                     praytimes=self._praytimes, time=time)
                 if is_praytime is not None:
 
@@ -125,10 +124,10 @@ class ModularBotTask:
                 await _do_the_lockdown(view_channel=False)
 
         else:
-            if time.strftime('%A-%H') == "Friday-21":
+            if time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['end']:
                 await _do_the_lockdown(view_channel=True)
 
-            if time.strftime('%A-%H') == "Friday-09":
+            if time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['start']:
                 await _do_the_lockdown(view_channel=False)
 
     @tasks.loop(seconds=30)
@@ -158,12 +157,13 @@ class ModularBotBase(commands.Bot):
     async def _help_embed(self) -> Embed:
         desc: str = f"Here's a few feature that's available on {ModularBotConst.SERVER_NAME}."
         embed: Embed = Embed(title=f"Menu {ModularBotConst.SERVER_NAME}",
-                         description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])))
+                             description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])))
 
         for command in await self.tree.fetch_commands():
             embed.add_field(name=f"**/{command.name}**",
-                        value=command.description, inline=True)
-        embed.set_author(name=self.user.name, icon_url=self.user.display_avatar)
+                            value=command.description, inline=True)
+        embed.set_author(name=self.user.name,
+                         icon_url=self.user.display_avatar)
         embed.set_footer(
             text=f" © {ModularBotConst.BOT_NAME} • Development mode, if there is something wrong contact Admin")
         return embed
@@ -176,10 +176,10 @@ class ModularBotBase(commands.Bot):
         channel_count: int = len(self._guild.channels)
         role_count: int = len(self._guild.roles)
 
-        voice_channels: List[VoiceChannel] = [self.get_channel(channel) for channel in [
+        voice_channels: list[VoiceChannel] = [self.get_channel(channel) for channel in [
             GuildChannel.MEMBER_ANALYTICS,
             GuildChannel.USER_ANALYTICS,
-            GuildChannel.BOT_ANALYTICST,
+            GuildChannel.BOT_ANALYTICS,
             GuildChannel.CHANNEL_ANALYTICS,
             GuildChannel.ROLE_ANALYTICS
         ]]
@@ -261,9 +261,9 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         elif self.user.mentioned_in(message=message) and search(rf"<@{self.user.id}>|<@!{self.user.id}>", message.content, flags=IGNORECASE):
             await message.channel.send(embed=await self._help_embed())
 
-        #TODO Need fix
+        # TODO Need fix
         # if not message.channel.is_nsfw():
-        #     react: Union[str, Embed] = Reaction.message_generator(message=message.clean_content)
+        #     react: str | Embed = Reaction.message_generator(message=message.clean_content)
         #     if not react:
         #         return
         #     await message.channel.send(embed=react) if isinstance(react, Embed) else await message.channel.send(react)
@@ -295,6 +295,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
             create_task(self._begin_loop_task()),
             create_task(self.analytics())
         ])
+
 
 bot: commands.Bot = ModularBotClient()
 

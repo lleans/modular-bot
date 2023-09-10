@@ -1,7 +1,6 @@
 from datetime import datetime
 from os import path
 from io import BytesIO
-from typing import Union
 from logging import Logger, getLogger, INFO, StreamHandler
 
 from aiohttp import ClientSession
@@ -35,7 +34,7 @@ class ModularUtil:
                 return f"{resp['city']}, {resp['regionName']}, {resp['country']}"
             else:
                 return
-            
+
     @classmethod
     def setup_log(cls):
         logger: Logger = getLogger(ModularBotConst.BOT_NAME)
@@ -44,24 +43,24 @@ class ModularUtil:
         handler = StreamHandler()
         handler.setFormatter(_ColourFormatter())
         logger.addHandler(handler)
-            
+
     @classmethod
     def simple_log(cls, message: str):
         logger: Logger = getLogger(ModularBotConst.BOT_NAME)
         logger.info(message)
 
     @classmethod
-    async def send_response(cls, interaction: Interaction, /, message: str = None, embed: Embed = None, emoji: Union[Emoji, str] = None, view: View = None, ephemeral: bool = False) -> Message:
+    async def send_response(cls, interaction: Interaction, /, message: str = None, embed: Embed = None, emoji: Emoji | str = None, view: View = None, ephemeral: bool = False) -> Message:
         msg: Message = None
         temp: str = str()
 
         if not view:
             view = View()
 
-        def change_emoji(message: str, emoji: Union[Emoji, str], ephemeral: bool = False) -> str:
+        def change_emoji(message: str, emoji: Emoji | str, ephemeral: bool = False) -> str:
             if isinstance(emoji, str) and ephemeral:
                 return f"{emoji} {message}"
-            
+
             if isinstance(emoji, Emoji):
                 return f"{str(emoji)} {message}"
 

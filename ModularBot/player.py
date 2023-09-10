@@ -1,7 +1,7 @@
 
 from datetime import timedelta
 from asyncio import wait, create_task
-from typing import Any, Union, Tuple
+from typing import Union, Tuple
 from itertools import chain
 from random import choice
 from enum import Enum
@@ -14,8 +14,8 @@ from discord.ext import commands, tasks
 from discord.app_commands import check
 
 from wavelink import Node, TrackEventPayload, WebsocketClosedPayload, QueueEmpty, BaseQueue
-from wavelink.player import Player
-from wavelink.tracks import YouTubePlaylist, YouTubeTrack, YouTubeMusicTrack, SoundCloudPlaylist, SoundCloudTrack, Playlist, Playable
+from wavelink.player import Player, Queue
+from wavelink.tracks import YouTubeTrack, YouTubeMusicTrack, SoundCloudPlaylist, SoundCloudTrack, Playlist, Playable
 from wavelink.node import Node, NodePool
 from wavelink.ext.spotify import SpotifyTrack, SpotifyClient, SpotifyRequestError, SpotifySearchType, SpotifyDecodePayload, decode_url,  BASEURL
 from wavelink.types.track import Track as TrackPayload
@@ -161,12 +161,12 @@ class SelectView(View):
 
     SHOW_LIMIT = 25
 
-    def __init__(self, control, author: Member, /, data: list[Union[Playable, SpotifyTrack]], is_jump_command: bool = False, autoplay: bool = None, *, timeout: float | None = 180):
-        self._data: list[Union[Playable, SpotifyTrack]] = list(data)[
+    def __init__(self, control, author: Member, /, data: list[Playable | SpotifyTrack], is_jump_command: bool = False, autoplay: bool = None, *, timeout: float | None = 180):
+        self._data: list[Playable | SpotifyTrack] = list(data)[
             0:self.SHOW_LIMIT]
         self._track_control: MusicPlayer = control
         self._author: Member = author
-        self._selected: Union[Playable, SpotifyTrack] = None
+        self._selected: Playable | SpotifyTrack = None
         self._is_jump_command: bool = is_jump_command
         self._autoplay: bool = autoplay
         self.rand_emoji: list(
@@ -228,8 +228,8 @@ class SelectView(View):
 
 class QueueView(View):
 
-    def __init__(self, queue: Union[chain, BaseQueue], is_history: bool = False, *, timeout: float | None = 180):
-        self._data: list[Union[Playable, SpotifyTrack]] = list(queue)
+    def __init__(self, queue: chain | BaseQueue, is_history: bool = False, *, timeout: float | None = 180):
+        self._data: list[Playable | SpotifyTrack] = list(queue)
         for x in self._data:
             if isinstance(x, SpotifyTrack):
                 x = MusicPlayerBase._spotify_patcher(x)
@@ -262,7 +262,7 @@ class QueueView(View):
 
         return embed
 
-    def _get_current_page_data(self) -> list[Union[Playable, SpotifyTrack]]:
+    def _get_current_page_data(self) -> list[Playable | SpotifyTrack]:
         start_index = 0
         end_index = self._limit_show
 
@@ -439,11 +439,11 @@ class MusicPlayerBase:
         sec = sec // 1000
         m, s = divmod(sec, 60)
         h, m = divmod(m, 60)
-        if sec > 3600:
+        if sec >= 3600:
             return f'{h:d}h {m:02d}m {s:02d}s'
         else:
             return f'{m:02d}m {s:02d}s'
-        
+
     @classmethod
     def _spotify_patcher(cls, child: SpotifyTrack) -> SpotifyTrack:
 
@@ -544,7 +544,7 @@ class MusicPlayerBase:
             raw_data_spotify = await _get_raw_spotify_playlist(raw_uri)
 
         if is_playlist:
-            playlist: Union[Playlist, list[SpotifyTrack]] = track
+            playlist: Playlist | list[SpotifyTrack] = track
             embed.description = f"✅ Queued {'(on front)' if is_put_front == 1 else ''} - {len(playlist.tracks)  if not isinstance(playlist, list) else len(playlist)} \
             tracks from ** [{playlist.name if not isinstance(playlist, list) else raw_data_spotify['name']}]({raw_uri if not isinstance(playlist, list) else raw_data_spotify['uri']})**"
         elif is_queued:
@@ -622,7 +622,7 @@ class MusicPlayerBase:
     @commands.Cog.listener()
     async def on_wavelink_websocket_closed(self, payload: WebsocketClosedPayload) -> None:
         if payload.player.is_playing() or payload.player.is_paused():
-            await wait([self._clear_message(payload.player.guild.id)])
+            await self._clear_message(payload.player.guild.id)
 
         if payload.by_discord:
             await payload.player.disconnect()
@@ -677,9 +677,11 @@ class MusicPlayer(MusicPlayerBase):
             player.autoplay = player.autoplay
         else:
             player.autoplay = autoplay
+            if not player.autoplay:
+                player.auto_queue = Queue()
 
         if isinstance(tracks, (Playlist, list)):
-            playlist: Union[Playlist, list[SpotifyTrack]] = tracks
+            playlist: Playlist | list[SpotifyTrack] = tracks
             if force_play:
                 player.queue.put_at_front(player.queue.history.pop())
 
@@ -694,7 +696,7 @@ class MusicPlayer(MusicPlayerBase):
                 await player.seek(player.current.length * 1000)
 
             if not player.is_playing():
-                trck: Union[Playable, SpotifyTrack] = await player.queue.get_wait()
+                trck: Playable | SpotifyTrack = await player.queue.get_wait()
                 if isinstance(trck, SpotifyTrack):
                     trck = await trck.fulfill(
                         player=player, cls=CustomYoutubeMusic, populate=False)
@@ -709,7 +711,7 @@ class MusicPlayer(MusicPlayerBase):
 
             if put_front:
                 player.queue.put_at_front(tracks)
-            else:
+            elif not force_play:
                 await player.queue.put_wait(tracks)
 
             is_queued = True
@@ -717,7 +719,7 @@ class MusicPlayer(MusicPlayerBase):
             trck = tracks
             if isinstance(trck, SpotifyTrack):
                 trck = await trck.fulfill(player=player, cls=CustomYoutubeMusic,
-                                              populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
+                                          populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
             await player.play(trck, populate=True if autoplay and track_type is not TrackType.SOUNCLOUD else False)
 
         return (tracks, is_playlist, is_queued)
@@ -737,7 +739,7 @@ class MusicPlayer(MusicPlayerBase):
         player: Player = interaction.user.guild.voice_client
 
         if index is not None:
-            track: Union[Playable, SpotifyTrack] = None
+            track: Playable | SpotifyTrack = None
 
             if index < player.queue.count:
                 track = player.queue[index]

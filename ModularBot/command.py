@@ -270,7 +270,6 @@ class Multimedia(commands.Cog, MusicPlayer):
         Choice(name='False', value=0)])
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
-    @MusicPlayerBase._is_playing()
     async def _queue(self, interaction: Interaction, is_history: Choice[int] = 0) -> None:
         await interaction.response.defer(ephemeral=True)
 
@@ -323,9 +322,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         except IndexError:
             embed.description = "📪 Queue is empty"
 
-        await wait([
-            create_task(ModularUtil.send_response(interaction, embed=embed, view=view))
-        ])
+        await create_task(ModularUtil.send_response(interaction, embed=embed, view=view))
 
     @command(name="previous", description="Play previous track(All queue still saved)")
     @MusicPlayerBase._is_client_exist()
@@ -344,9 +341,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         if not was_allowed:
             embed.description = "📪 History is empty"
 
-        await wait([
-            create_task(ModularUtil.send_response(interaction, embed=embed))
-        ])
+        await create_task(ModularUtil.send_response(interaction, embed=embed))
 
     @command(name="stop", description="Stop anything(This will reset player back to initial state)")
     @MusicPlayerBase._is_client_exist()

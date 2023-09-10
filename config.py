@@ -1,18 +1,25 @@
+from dotenv import load_dotenv
 from os import getenv
+
+load_dotenv()
 
 class ModularBotConst:
     SERVER_NAME = "Kantin Yoyok"
     BOT_NAME = "Pak Yoyok"
     BOT_PREFIX = "!pkyyk"
-    SERVER_ID = 623123009770749974
+    SERVER_ID = getenv('SERVER_ID')
     TIMEZONE = "Asia/Jakarta"
+    LOCKDOWN_TIME = {
+        'start': "Friday-09",
+        'end': "Friday-21"
+    }
     REQUEST_LIMIT = 2
     COLOR = {
         'random_array': ["ffe552", "ffc052", "ff7d52", "ff5252", "ff5289", "ff5252"],
-        'success': '198754',
-        'failed': 'CA0B00',
-        'queue': '0E86D4',
-        'play': 'E49B0F'
+        'success': "198754",
+        'failed': "CA0B00",
+        'queue': "0E86D4",
+        'play': "E49B0F"
     }
     IMAGE = {
         'random_array': ["https://i.imgur.com/ImFzDtd.gif", "https://i.imgur.com/vSIWwxP.gif", "https://i.imgur.com/tXnd4IZ.gif", "https://i.imgur.com/IverxEm.gif"],
@@ -20,38 +27,37 @@ class ModularBotConst:
         'leave_banner': "https://cdn.discordapp.com/attachments/709580371146047498/802553806557544488/NlWRR4o.png"
     }
 
-    #Begin Environment Variable
-    #TODO change it after debugging
-    TOKEN = getenv("TOKEN")
-    # TOKEN = open("TOKEN").readline()
+    # Begin Environment Variable
+    # TODO change it after debugging
+    TOKEN = getenv('TOKEN')
+    # TOKEN = open('TOKEN').readline()
     SPOTIFY_CLIENT = getenv('SPOTIFY_CLIENT')
     SPOTIFY_SECRET = getenv('SPOTIFY_SECRET')
-    LAVALINK_SERVER = getenv("LAVALINK_SERVER")
-    LAVALINK_PASSWORD = getenv("LAVALINK_PASSWORD")
-
+    LAVALINK_SERVER = getenv('LAVALINK_SERVER')
+    LAVALINK_PASSWORD = getenv('LAVALINK_PASSWORD')
 
 
 class GuildChannel:
-    BINCANG_HARAM_CHANNEL = 783138508038471701
-    VERIFICATION_CHANNEL = 811292476806660107
-    INVITE_CHANNEL = 746678416434003998
-    PRAYER_CHANNEL = 832276804189945857
-    WELCOME_CHANNEL = 728584639475613736
-    GOODBYE_CHANNEL = 768133346278244402
+    BINCANG_HARAM_CHANNEL = getenv('BINCANG_HARAM_CHANNEL')
+    VERIFICATION_CHANNEL = getenv('VERIFICATION_CHANNEL')
+    INVITE_CHANNEL = getenv('INVITE_CHANNEL')
+    PRAYER_CHANNEL = getenv('PRAYER_CHANNEL')
+    WELCOME_CHANNEL = getenv('WELCOME_CHANNEL')
+    GOODBYE_CHANNEL = getenv('GOODBYE_CHANNEL')
 
-    MEMBER_ANALYTICS = 788003407834906664
-    USER_ANALYTICS = 788003408006217749
-    BOT_ANALYTICST = 788003408846127154
-    CHANNEL_ANALYTICS = 788003409327685642
-    ROLE_ANALYTICS = 788003409797840926
+    MEMBER_ANALYTICS = getenv('MEMBER_ANALYTICS')
+    USER_ANALYTICS = getenv('USER_ANALYTICS')
+    BOT_ANALYTICS = getenv('BOT_ANALYTICS')
+    CHANNEL_ANALYTICS = getenv('CHANNEL_ANALYTICS')
+    ROLE_ANALYTICS = getenv('ROLE_ANALYTICS')
 
 
 class GuildRole:
-    TETUA = 758206420503494657
-    THE_MUSKETEER = 684600810520182892
-    BOT = 684600176303669260
-    MAGICIAN = 728203532678725753
-    MUTE = 1043875115932319865
+    TETUA = getenv('TETUA')
+    THE_MUSKETEER = getenv('THE_MUSKETEER')
+    BOT = getenv('BOT')
+    MAGICIAN = getenv('MAGICIAN')
+    MUTE = getenv('MUTE')
 
 
 class GuildMessage:
@@ -71,5 +77,8 @@ class GuildMessage:
 
 
 class Expression:
+    BAD_WORDS_REGEX = getenv('BAD_WORDS_REGEX')
+    STRESS_WORDS_REGEX = getenv('STRESS_WORDS_REGEX')
+    HOLY_WORDS_REGEX = getenv('HOLY_WORDS_REGEX')
     RANDOM_EXPRESSION = ["Gabut aja....", "Gua ngak tau", "Lah ngatur",
                          "Gitu doang baper", "Suka-suka", "Gay", "Biadab", "Sok asik"]
