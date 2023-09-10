@@ -14,7 +14,7 @@ from discord.ext import commands, tasks
 from discord.app_commands import check
 
 from wavelink import Node, TrackEventPayload, WebsocketClosedPayload, QueueEmpty, BaseQueue
-from wavelink.player import Player, Queue
+from wavelink.player import Player
 from wavelink.tracks import YouTubeTrack, YouTubeMusicTrack, SoundCloudPlaylist, SoundCloudTrack, Playlist, Playable
 from wavelink.node import Node, NodePool
 from wavelink.ext.spotify import SpotifyTrack, SpotifyClient, SpotifyRequestError, SpotifySearchType, SpotifyDecodePayload, decode_url,  BASEURL
@@ -678,7 +678,7 @@ class MusicPlayer(MusicPlayerBase):
         else:
             player.autoplay = autoplay
             if not player.autoplay:
-                player.auto_queue = Queue()
+                player.auto_queue.clear()
 
         if isinstance(tracks, (Playlist, list)):
             playlist: Playlist | list[SpotifyTrack] = tracks
