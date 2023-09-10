@@ -7,7 +7,7 @@ class ModularBotConst:
     SERVER_NAME = "Kantin Yoyok"
     BOT_NAME = "Pak Yoyok"
     BOT_PREFIX = "!pkyyk"
-    SERVER_ID = getenv('SERVER_ID')
+    SERVER_ID = int(getenv('SERVER_ID'))
     TIMEZONE = "Asia/Jakarta"
     LOCKDOWN_TIME = {
         'start': "Friday-09",
@@ -38,26 +38,26 @@ class ModularBotConst:
 
 
 class GuildChannel:
-    BINCANG_HARAM_CHANNEL = getenv('BINCANG_HARAM_CHANNEL')
-    VERIFICATION_CHANNEL = getenv('VERIFICATION_CHANNEL')
-    INVITE_CHANNEL = getenv('INVITE_CHANNEL')
-    PRAYER_CHANNEL = getenv('PRAYER_CHANNEL')
-    WELCOME_CHANNEL = getenv('WELCOME_CHANNEL')
-    GOODBYE_CHANNEL = getenv('GOODBYE_CHANNEL')
+    BINCANG_HARAM_CHANNEL = int(getenv('BINCANG_HARAM_CHANNEL'))
+    VERIFICATION_CHANNEL = int(getenv('VERIFICATION_CHANNEL'))
+    INVITE_CHANNEL = int(getenv('INVITE_CHANNEL'))
+    PRAYER_CHANNEL = int(getenv('PRAYER_CHANNEL'))
+    WELCOME_CHANNEL = int(getenv('WELCOME_CHANNEL'))
+    GOODBYE_CHANNEL = int(getenv('GOODBYE_CHANNEL'))
 
-    MEMBER_ANALYTICS = getenv('MEMBER_ANALYTICS')
-    USER_ANALYTICS = getenv('USER_ANALYTICS')
-    BOT_ANALYTICS = getenv('BOT_ANALYTICS')
-    CHANNEL_ANALYTICS = getenv('CHANNEL_ANALYTICS')
-    ROLE_ANALYTICS = getenv('ROLE_ANALYTICS')
+    MEMBER_ANALYTICS = int(getenv('MEMBER_ANALYTICS'))
+    USER_ANALYTICS = int(getenv('USER_ANALYTICS'))
+    BOT_ANALYTICS = int(getenv('BOT_ANALYTICS'))
+    CHANNEL_ANALYTICS = int(getenv('CHANNEL_ANALYTICS'))
+    ROLE_ANALYTICS = int(getenv('ROLE_ANALYTICS'))
 
 
 class GuildRole:
-    TETUA = getenv('TETUA')
-    THE_MUSKETEER = getenv('THE_MUSKETEER')
-    BOT = getenv('BOT')
-    MAGICIAN = getenv('MAGICIAN')
-    MUTE = getenv('MUTE')
+    TETUA = int(getenv('TETUA'))
+    THE_MUSKETEER = int(getenv('THE_MUSKETEER'))
+    BOT = int(getenv('BOT'))
+    MAGICIAN = int(getenv('MAGICIAN'))
+    MUTE = int(getenv('MUTE'))
 
 
 class GuildMessage:
