@@ -32,7 +32,7 @@ class ModularBotTask:
         if not self._change_activity.is_running():
             self._change_activity.start()
 
-    async def _ramadhan_checker(self) -> None:
+    async def __ramadhan_checker(self) -> None:
         self._is_ramadhan: bool = False
 
         if self._praytimes:
@@ -78,7 +78,7 @@ class ModularBotTask:
     async def _pull_data(self) -> None:
         try:
             self._praytimes = await Prayers.get_prayertime(session=self.session)
-            await self._ramadhan_checker()
+            await self.__ramadhan_checker()
         except:
             pass
 
@@ -168,7 +168,7 @@ class ModularBotBase(commands.Bot):
             text=f" © {ModularBotConst.BOT_NAME} • Development mode, if there is something wrong contact Admin")
         return embed
 
-    async def analytics(self) -> None:
+    async def _analytics(self) -> None:
         member_count: int = self._guild.member_count
         the_musketter_count: int = len(
             self._guild.get_role(GuildRole.THE_MUSKETEER).members)
@@ -218,13 +218,13 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         await self.anlytics()
 
     async def on_guild_channel_create(self, *_):
-        await self.analytics()
+        await self._analytics()
 
     async def on_guild_role_delete(self, *_):
-        await self.analytics()
+        await self._analytics()
 
     async def on_guild_role_create(self, *_):
-        await self.analytics()
+        await self._analytics()
 
     async def on_member_join(self, member: Member) -> None:
         if member.guild.id is not self._guild.id:
@@ -238,7 +238,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
             BytesIO(welcome_banner.getbuffer()), filename='image.png')
         await welcome_channel.send(file=image_file)
 
-        await self.analytics()
+        await self._analytics()
         try:
             return await member.send(GuildMessage.DM_MESSAGE)
         except errors.Forbidden:
@@ -252,7 +252,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         image_file: File = File(
             BytesIO(leave_banner.getbuffer()), filename='image.png')
 
-        await self.analytics()
+        await self._analytics()
         return await leave_channel.send(file=image_file)
 
     async def on_message(self, message: Message) -> None:
@@ -293,7 +293,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
 
         await wait([
             create_task(self._begin_loop_task()),
-            create_task(self.analytics())
+            create_task(self._analytics())
         ])
 
 

@@ -1,6 +1,5 @@
 from asyncio import wait, create_task
 from datetime import timedelta
-from typing import Union
 
 from discord import Interaction, Embed, Member, Role, Message
 from discord.ext import commands
@@ -171,7 +170,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         ])
 
     @command(name="search", description="Search your track by query")
-    @describe(query="Track keyword(You can pass through playlist to pick on it)", 
+    @describe(query="Track keyword(You can pass through playlist to pick on it)",
               source="Get track from different source(Default is Youtube, Spotify will automatically convert into Youtube)",
               autoplay="Autoplay recomendation from you've been played(Soundcloud not supported)")
     @choices(autoplay=[
@@ -185,10 +184,10 @@ class Multimedia(commands.Cog, MusicPlayer):
         view: View = View()
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']))
-        
+
         autoplay = Choice(
             name="None", value=None) if autoplay == 0 else autoplay
-        
+
         if autoplay.value == None:
             convert_autoplay = None
 
@@ -232,10 +231,10 @@ class Multimedia(commands.Cog, MusicPlayer):
         convert_autoplay: bool = False
         convert_force_play: bool = False
         convert_put_front: bool = False
-        track: Union[Playlist, Playable, SpotifyTrack] = None
+        track: Playlist | Playable | SpotifyTrack = None
         is_playlist = is_queued = False
         embed: Embed = Embed(color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['failed']), description="❌ Track not found")
+            ModularBotConst.COLOR['failed']), description="❌ Track not found\nIf you're using link, check if it's supported or not")
 
         if autoplay.value == None:
             convert_autoplay = None
@@ -257,7 +256,7 @@ class Multimedia(commands.Cog, MusicPlayer):
                                                             force_play=convert_force_play,
                                                             put_front=convert_put_front)
 
-            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front, is_autoplay=convert_autoplay, raw_uri=query)
+            embed = await self._play_response(interaction.user, track=track, is_playlist=is_playlist, is_queued=is_queued, is_put_front=convert_put_front or convert_force_play, is_autoplay=convert_autoplay, raw_uri=query)
         except IndexError:
             pass
 
@@ -299,7 +298,7 @@ class Multimedia(commands.Cog, MusicPlayer):
         await interaction.response.defer()
         embed: Embed = Embed(
             description="⏯️ Skipped",
-            color=ModularUtil.convert_color(ModularBotConst.COLOR['failed'])
+            color=ModularUtil.convert_color(ModularBotConst.COLOR['success'])
         )
 
         await wait([
@@ -307,7 +306,7 @@ class Multimedia(commands.Cog, MusicPlayer):
             create_task(ModularUtil.send_response(interaction, embed=embed))
         ])
 
-    @command(name="jump", description="Jump on specific music(Put selected track into front)")
+    @command(name="jump", description="Jump on specific track(Put selected track into front)")
     @MusicPlayerBase._is_client_exist()
     @MusicPlayerBase._is_user_allowed()
     @MusicPlayerBase._is_playing()
