@@ -5,17 +5,45 @@ from random import choice
 
 from datetime import timedelta, datetime
 from discord.ext import commands, tasks
-from discord import Intents, Message, Embed, TextChannel, Role, Guild, Interaction, VoiceChannel, Member, errors, Member, File, Activity, ActivityType
+from discord import (
+    Intents,
+    Message,
+    Embed,
+    TextChannel,
+    Role,
+    Guild,
+    Interaction,
+    VoiceChannel,
+    Member,
+    errors,
+    Member,
+    File,
+    Activity,
+    ActivityType
+)
 from discord.app_commands import guild_only
 from aiohttp import ClientSession
 from wavelink import Node, NodePool
 from wavelink.ext.spotify import SpotifyClient
 
-from config import GuildChannel, GuildRole, ModularBotConst, GuildMessage
+from config import (
+    GuildChannel,
+    GuildRole,
+    ModularBotConst,
+    GuildMessage
+)
 from ModularBot import ModularUtil, Prayers
 
 
 class ModularBotTask:
+
+    _guild: Guild
+    _role: Role
+
+    session: ClientSession
+    _praytime_message: Message
+    _praytime_channel: TextChannel
+    _praytimes: dict
 
     async def _begin_loop_task(self):
         await self._pull_data()
@@ -41,20 +69,22 @@ class ModularBotTask:
                 f"{self._praytimes['ramadhan']['start']} {time.strftime('%Y')}", "%B %d %Y")
             ramadhan_end: datetime = datetime.strptime(
                 f"{self._praytimes['ramadhan']['end']} {time.strftime('%Y')}", "%B %d %Y")
-            role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
-            channel: TextChannel = self.get_channel(
-                GuildChannel.PRAYER_CHANNEL)
 
             if ramadhan_start.date() <= time.date() < ramadhan_end.date():
+                role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
+                channel: TextChannel = self.get_channel(
+                    GuildChannel.PRAYER_CHANNEL)
 
                 if self._praytime_message is not None and (time.date() - timedelta(days=1)).day == (self._praytime_message.created_at + timedelta(hours=7)).day:
                     self._praytime_message = None
 
                 overwrites = channel.overwrites_for(self._role)
+
                 if not overwrites.view_channel:
                     await channel.set_permissions(role, view_channel=True)
 
                 self._is_ramadhan = True
+
             else:
                 self._is_ramadhan = False
                 self._praytime_message = None
@@ -90,8 +120,8 @@ class ModularBotTask:
             if self._is_ramadhan:
                 is_praytime: Embed | None = Prayers.prayers_generator(
                     praytimes=self._praytimes, time=time)
-                if is_praytime is not None:
 
+                if is_praytime is not None:
                     if self._praytime_message is not None:
                         await self._praytime_message.delete()
 
@@ -105,9 +135,11 @@ class ModularBotTask:
             for channel in self._guild.text_channels:
                 channel: TextChannel = channel
                 overwrites = channel.overwrites_for(self._role)
+                
                 if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel != view_channel:
                     await channel.set_permissions(self._role, view_channel=view_channel)
                     await sleep(2)
+
             return
 
         if self._praytimes and self._is_ramadhan:
@@ -120,14 +152,14 @@ class ModularBotTask:
             if time.time() >= buka.time():
                 await _do_the_lockdown(view_channel=True)
 
-            if time.time() >= imsak.time() and time.time() < buka.time():
+            elif time.time() >= imsak.time() and time.time() < buka.time():
                 await _do_the_lockdown(view_channel=False)
 
         else:
             if time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['end']:
                 await _do_the_lockdown(view_channel=True)
 
-            if time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['start']:
+            elif time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['start']:
                 await _do_the_lockdown(view_channel=False)
 
     @tasks.loop(seconds=30)
@@ -153,6 +185,8 @@ class ModularBotTask:
 
 
 class ModularBotBase(commands.Bot):
+
+    _guild: Guild
 
     async def _help_embed(self) -> Embed:
         desc: str = f"Here's a few feature that's available on {ModularBotConst.SERVER_NAME}."
@@ -215,7 +249,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         self.synced: bool = False
 
     async def on_guild_channel_delete(self, *_):
-        await self.anlytics()
+        await self._analytics()
 
     async def on_guild_channel_create(self, *_):
         await self._analytics()
@@ -258,6 +292,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
     async def on_message(self, message: Message) -> None:
         if message.author == self.user:
             return
+
         elif self.user.mentioned_in(message=message) and search(rf"<@{self.user.id}>|<@!{self.user.id}>", message.content, flags=IGNORECASE):
             await message.channel.send(embed=await self._help_embed())
 

@@ -2,16 +2,16 @@ version: "3.9"
 
 services:
   lavalink:
-    image: fredboat/lavalink:master
+    image: fredboat/lavalink:3
     environment:
       SERVER_PORT: 2333
       SERVER_ADDRESS: 0.0.0.0
       LAVALINK_SERVER_PASSWORD: "youshallnotpass"
       LAVALINK_SERVER_SOURCES_YOUTUBE: 'true'
-      LAVALINK_SERVER_SOURCES_BANDCAMP: 'true'
+      LAVALINK_SERVER_SOURCES_BANDCAMP: 'false'
       LAVALINK_SERVER_SOURCES_SOUNDCLOUD: 'true'
-      LAVALINK_SERVER_SOURCES_TWITCH: 'true'
-      LAVALINK_SERVER_SOURCES_VIMEO: 'true'
+      LAVALINK_SERVER_SOURCES_TWITCH: 'false'
+      LAVALINK_SERVER_SOURCES_VIMEO: 'false'
       LAVALINK_SERVER_SOURCES_HTTP: 'true'
       LAVALINK_SERVER_SOURCES_LOCAL: 'false'
       LAVALINK_SERVER_BUFFER_DURATION_MS: 400
@@ -26,8 +26,6 @@ services:
     volumes:
       - ./Lavalink/application.yml:/opt/Lavalink/application.yml
     restart: on-failure
-    env_file:
-      - .env
 
   bot:
     build:

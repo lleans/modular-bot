@@ -33,6 +33,7 @@ class ModularBotConst:
     # TOKEN = open('TOKEN').readline()
     SPOTIFY_CLIENT = getenv('SPOTIFY_CLIENT')
     SPOTIFY_SECRET = getenv('SPOTIFY_SECRET')
+    MUSIXMATCH_KEY = getenv('MUSIXMATCH_KEY')
     LAVALINK_SERVER = getenv('LAVALINK_SERVER')
     LAVALINK_PASSWORD = getenv('LAVALINK_PASSWORD')
 

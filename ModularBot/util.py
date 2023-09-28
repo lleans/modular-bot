@@ -1,10 +1,22 @@
 from datetime import datetime
 from os import path
 from io import BytesIO
-from logging import Logger, getLogger, INFO, StreamHandler
+from logging import (
+    Logger,
+    getLogger,
+    INFO,
+    StreamHandler
+)
 
 from aiohttp import ClientSession
-from discord import Embed, Emoji, Interaction, Message, InteractionResponded, MessageFlags
+from discord import (
+    Embed,
+    Emoji,
+    Interaction,
+    Message,
+    InteractionResponded,
+    MessageFlags
+)
 from discord.utils import _ColourFormatter
 from discord.ui import View
 from PIL import Image
@@ -18,13 +30,19 @@ class ModularUtil:
     __IP_GEOLOCATION_URL = "http://ip-api.com/json/"
     __ASSETS_DIR = path.join(path.dirname(__file__), "assets")
 
-    @classmethod
-    def get_time(cls) -> datetime:
+    @staticmethod
+    def get_time() -> datetime:
         return datetime.now(timezone(ModularBotConst.TIMEZONE))
 
-    @classmethod
-    def convert_color(cls, color: str) -> int:
+    @staticmethod
+    def convert_color(color: str) -> int:
         return int(color.lstrip('#'), 16)
+
+    @staticmethod
+    def truncate_string(text: str, /, max: int = 150) -> str:
+        if len(text) > max:
+            return text[:max-3] + "..."
+        return text
 
     @classmethod
     async def get_geolocation(cls, session: ClientSession) -> str:
@@ -35,8 +53,8 @@ class ModularUtil:
             else:
                 return
 
-    @classmethod
-    def setup_log(cls):
+    @staticmethod
+    def setup_log():
         logger: Logger = getLogger(ModularBotConst.BOT_NAME)
         logger.setLevel(INFO)
 
@@ -44,13 +62,14 @@ class ModularUtil:
         handler.setFormatter(_ColourFormatter())
         logger.addHandler(handler)
 
-    @classmethod
-    def simple_log(cls, message: str):
+    @staticmethod
+    def simple_log(message: str):
         logger: Logger = getLogger(ModularBotConst.BOT_NAME)
         logger.info(message)
 
-    @classmethod
-    async def send_response(cls, interaction: Interaction, /, message: str = None, embed: Embed = None, emoji: Emoji | str = None, view: View = None, ephemeral: bool = False) -> Message:
+    @staticmethod
+    async def send_response(interaction: Interaction, /,
+                            message: str = None, embed: Embed = None, emoji: Emoji | str = None, view: View = None, ephemeral: bool = False) -> Message:
         msg: Message = None
         temp: str = str()
 
@@ -86,11 +105,13 @@ class ModularUtil:
 
     @classmethod
     async def banner_creator(cls, username: str, avatar: str, is_welcome=True) -> BytesIO:
-        title: str = "Welcome".upper()
-        mssg: str = GuildMessage.BANNER['welcome_banner'].upper()
-        banner: str = ModularBotConst.IMAGE['welcome_banner']
 
-        if not is_welcome:
+        if is_welcome:
+            title: str = "Welcome".upper()
+            mssg: str = GuildMessage.BANNER['welcome_banner'].upper()
+            banner: str = ModularBotConst.IMAGE['welcome_banner']
+
+        else:
             title = "Goodbye".upper()
             mssg = GuildMessage.BANNER['leave_banner'].upper()
             banner: str = ModularBotConst.IMAGE['leave_banner']

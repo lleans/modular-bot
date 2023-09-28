@@ -74,12 +74,15 @@ class Prayers:
                     e.description = "Selamat Berbuka Puasa. Bersyukurlah kalian bisa berbuka dengan makanan enak, diluar sana masih banyak yang belum bisa kayak kamu. " \
                         "Jadi, tetaplah bersyukur walaupun kamu buka dengan tahu tempe :).\nJangan lupa Salat Maghrib habis buka.\n\n" + e.description
                     e.set_image(url=choice(cls.__BUKA_IMAGE))
+
                 elif pray == "Isya":
                     e.title = f"Waktu Salat Tarawih untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
                     e.description = f"Waktunya Tarawih. Bukanya Tarawih, malah buka nHen..., salat dulu yang bener!!.\n\n" + e.description
+
                 else:
                     e.title = f"Waktu Salat {pray} untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
                     e.description = f"Waktunya Salat {pray}. Salat yang khusyuk, biar bisa ketemu waifu di isekaid.\n\n" + e.description
+                    
             if pray != "ramadhan":
                 e.add_field(
                     name=f"{pray+' (Buka)' if pray == 'Maghrib' else pray}:", value=prayt)
