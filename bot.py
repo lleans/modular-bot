@@ -194,12 +194,17 @@ class ModularBotBase(commands.Bot):
                              description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])))
 
         for command in await self.tree.fetch_commands():
-            embed.add_field(name=f"**/{command.name}**",
-                            value=command.description, inline=True)
+            if command.description:
+                embed.add_field(name=f"**/{command.name}**",
+                                value=command.description, inline=True)
+                
+            else:
+                embed.add_field(name=f"**{command.name}**",
+                                value="Access it through Apps Command", inline=True)
         embed.set_author(name=self.user.name,
                          icon_url=self.user.display_avatar)
         embed.set_footer(
-            text=f" © {ModularBotConst.BOT_NAME} • Development mode, if there is something wrong contact Admin")
+            text=f" © {ModularBotConst.BOT_NAME} • If there is something wrong contact Admin")
         return embed
 
     async def _analytics(self) -> None:

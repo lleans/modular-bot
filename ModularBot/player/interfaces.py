@@ -190,38 +190,31 @@ class CustomPlayer(Player):
         """
         assert self._guild is not None
 
-        if isinstance(track, YouTubeTrack):
-            if 'official' in track.title.casefold() \
-                    or 'ost' in track.title.casefold() \
-                    or 'topic' in track.author.casefold():
-                track: CustomYouTubeMusicTrack = CustomYouTubeMusicTrack(
-                    data=track.data)
+        if isinstance(track, YouTubeTrack) and self.autoplay and populate:
+            was_ytms: bool = isinstance(track, CustomYouTubeMusicTrack)
+            query: str = f'https://{"music" if was_ytms else "www"}.youtube.com/watch?v={track.identifier}&list=RD{track.identifier}'
 
-            if self.autoplay and populate:
-                was_ytms: bool = isinstance(track, CustomYouTubeMusicTrack)
-                query: str = f'https://{"music" if was_ytms else "www"}.youtube.com/watch?v={track.identifier}&list=RD{track.identifier}'
+            try:
+                recos: YouTubePlaylist = await self.current_node.get_playlist(query=query, cls=YouTubePlaylist)
+                recos: list[YouTubeTrack] = getattr(recos, 'tracks', [])
 
-                try:
-                    recos: YouTubePlaylist = await self.current_node.get_playlist(query=query, cls=YouTubePlaylist)
-                    recos: list[YouTubeTrack] = getattr(recos, 'tracks', [])
+                queues = set(self.queue) | set(self.auto_queue) | set(
+                    self.auto_queue.history) | {track}
 
-                    queues = set(self.queue) | set(self.auto_queue) | set(
-                        self.auto_queue.history) | {track}
+                for track_ in recos:
+                    track_ = CustomYouTubeTrack(data=track_.data)
 
-                    for track_ in recos:
-                        track_ = CustomYouTubeTrack(data=track_.data)
+                    if was_ytms:
+                        track_ = CustomYouTubeMusicTrack(data=track_.data)
 
-                        if was_ytms:
-                            track_ = CustomYouTubeMusicTrack(data=track_.data)
+                    if track_ in queues:
+                        continue
 
-                        if track_ in queues:
-                            continue
+                    await self.auto_queue.put_wait(track_)
 
-                        await self.auto_queue.put_wait(track_)
-
-                    self.auto_queue.shuffle()
-                except ValueError:
-                    pass
+                self.auto_queue.shuffle()
+            except ValueError:
+                pass
 
         elif isinstance(track, SpotifyTrack):
             track = UtilTrackPlayer.spotify_patcher(track)
