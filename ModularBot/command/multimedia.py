@@ -15,10 +15,14 @@ from discord.app_commands import (
 from discord.ui import View
 
 from wavelink import Playable, Playlist, QueueEmpty
-from wavelink.ext.spotify import SpotifyTrack
 
 from ..util import ModularUtil
-from ..player import TrackPlayerDecorator, TrackPlayer, TrackType
+from ..player import (
+    TrackPlayerDecorator,
+    TrackPlayer,
+    TrackType,
+    CustomSpotifyTrack
+)
 from config import ModularBotConst
 
 
@@ -135,7 +139,7 @@ class Multimedia(commands.Cog, TrackPlayer):
             name="None", value=None) if autoplay == 0 else autoplay
 
         convert_autoplay: bool = False
-        track: Playlist | Playable | SpotifyTrack = None
+        track: Playlist | Playable | CustomSpotifyTrack = None
         is_playlist = is_queued = False
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['failed']), description="❌ Track not found\nIf you're using link, check if it's supported or not")

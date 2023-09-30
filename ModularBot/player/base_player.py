@@ -1,5 +1,5 @@
 from datetime import timedelta
-from asyncio import gather
+from asyncio import gather, create_task
 
 from yarl import URL
 
@@ -22,15 +22,17 @@ from wavelink import (
     SoundCloudPlaylist,
     SoundCloudTrack,
     YouTubePlaylist,
+    YouTubeTrack,
     Playlist,
-    Playable
+    Playable,
+    Queue
 )
-from wavelink.ext.spotify import SpotifyTrack
+from wavelink.ext.spotify import decode_url, SpotifySearchType
 
 from .interfaces import (
     CustomPlayer,
     CustomYouTubeMusicTrack,
-    CustomYouTubeTrack,
+    CustomSpotifyTrack,
     TrackType
 )
 from .view import TrackView
@@ -123,9 +125,9 @@ class TrackPlayerBase:
                     self.__guilds[id]['timestamp'] = ModularUtil.get_time(
                     )
 
-    async def _custom_wavelink_player(self, query: str, track_type: TrackType, is_search: bool = False) -> Playable | Playlist | SpotifyTrack | list[SpotifyTrack]:
+    async def _custom_wavelink_player(self, query: str, track_type: TrackType, is_search: bool = False) -> Playable | Playlist | CustomSpotifyTrack | list[CustomSpotifyTrack]:
         """Will return either List of tracks or Single Tracks"""
-        tracks: Playable | Playlist | SpotifyTrack | list[SpotifyTrack] = None
+        tracks: Playable | Playlist | CustomSpotifyTrack | list[CustomSpotifyTrack] = None
         is_playlist: bool = False
         search_limit: int = 30
         url: URL = None
@@ -133,7 +135,9 @@ class TrackPlayerBase:
         if query.startswith('http'):
             url = URL(query)
 
-            if url.query.get('list'):
+            if track_type is TrackType.SPOTIFY and decode_url(query).type in (SpotifySearchType.playlist, SpotifySearchType.album):
+                is_playlist = True
+            elif url.query.get('list') or 'sets' in url.path:
                 is_playlist = True
 
         if track_type in (TrackType.YOUTUBE, TrackType.YOUTUBE_MUSIC):
@@ -148,7 +152,7 @@ class TrackPlayerBase:
                 else:
                     tracks: CustomYouTubeMusicTrack = await CustomYouTubeMusicTrack.search(query)
             elif not is_playlist:
-                tracks: CustomYouTubeTrack = await CustomYouTubeTrack.search(query)
+                tracks: YouTubeTrack = await YouTubeTrack.search(query)
 
         elif track_type is TrackType.SOUNCLOUD:
             if is_playlist:
@@ -158,15 +162,8 @@ class TrackPlayerBase:
                 tracks: SoundCloudTrack = await SoundCloudTrack.search(query)
 
         elif track_type is TrackType.SPOTIFY:
-            tracks: list[SpotifyTrack] = list()
-            if url:
-                tracks = await SpotifyTrack.search(query)
-            else:
-                # Session from aiohttp bot main
-                tracks = await UtilTrackPlayer.search_spotify_raw(self._bot.session, query=query, limit=search_limit)
-
-            for trck in tracks:
-                UtilTrackPlayer.spotify_patcher(trck)
+            tracks: list[CustomSpotifyTrack] = list()
+            tracks = await CustomSpotifyTrack.search(query)
 
         if is_search:
             tracks = tracks[0:search_limit]
@@ -183,11 +180,7 @@ class TrackPlayerBase:
     async def _lyrics_finder(self, interaction: Interaction) -> Embed:
         player: CustomPlayer = interaction.guild.voice_client
         lyrics: str = None
-        track: Playable | SpotifyTrack = player.current
-
-        if isinstance(track, CustomYouTubeMusicTrack | CustomYouTubeTrack) and\
-                track.spotify_original is not None:
-            track = track.spotify_original
+        track: Playable | CustomSpotifyTrack = player._original
 
         ms: MusixMatchAPI = MusixMatchAPI(track, self._bot.session)
 
@@ -211,7 +204,7 @@ class TrackPlayerBase:
 
         return embed
 
-    async def _play_response(self, member: Member, /, track: Playlist | Playable | SpotifyTrack | list[SpotifyTrack],
+    async def _play_response(self, member: Member, /, track: Playlist | Playable | CustomSpotifyTrack | list[CustomSpotifyTrack],
                              is_playlist: bool = False, is_queued: bool = False, is_put_front: bool = False, is_autoplay: bool = False, uri: str = None) -> Embed:
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
@@ -221,10 +214,10 @@ class TrackPlayerBase:
 
         if isinstance(track, list):
             # Session from aiohttp bot main
-            raw_data_spotify = await UtilTrackPlayer.get_raw_spotify_uri(self._bot.session, uri)
+            raw_data_spotify = await UtilTrackPlayer.get_raw_spotify_playlist(self._bot.session, uri)
 
         if is_playlist:
-            playlist: Playlist | list[SpotifyTrack] = track
+            playlist: Playlist | list[CustomSpotifyTrack] = track
             embed.description = f"✅ Queued {'(on front)' if is_put_front else ''} - {len(playlist.tracks)  if not raw_data_spotify else len(playlist)} \
             tracks from ** [{playlist.name if not raw_data_spotify else raw_data_spotify['name']}]({uri if not raw_data_spotify else raw_data_spotify['uri']})**"
 
@@ -284,6 +277,21 @@ class TrackPlayerBase:
         interaction: Interaction = self.__guilds[player.guild.id]['interaction']
         channel: TextChannel = interaction.channel
         message: Message = None
+        cache_limit: int = 3
+
+        async def __cache_spotify_track(queue: Queue) -> None:
+            if queue.is_empty:
+                return
+
+            for x in range(cache_limit):
+                try:
+                    if not queue.is_empty \
+                            and queue.count >= x \
+                            and isinstance(queue[x], CustomSpotifyTrack) \
+                            and not queue[x].fetched:
+                        await queue[x].fulfill(player=player, populate=player.autoplay)
+                except:
+                    continue
 
         track_view: TrackView = TrackView(self, player=player)
 
@@ -295,6 +303,10 @@ class TrackPlayerBase:
         self.__record_message(guild_id=player.guild.id, message=message)
         await message.edit(view=track_view)
 
+        create_task(__cache_spotify_track(player.queue))
+        if player.queue.count <= cache_limit:
+            create_task(__cache_spotify_track(player.auto_queue))
+
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, payload: TrackEventPayload) -> None:
         player: CustomPlayer = payload.player
@@ -302,7 +314,7 @@ class TrackPlayerBase:
         await gather(self.__clear_message(player.guild.id))
 
         if not player.autoplay and not player.queue.is_empty:
-            track: Playable | SpotifyTrack = await player.queue.get_wait()
+            track: Playable | CustomSpotifyTrack = await player.queue.get_wait()
             await player.play(track=track)
 
     @commands.Cog.listener()
