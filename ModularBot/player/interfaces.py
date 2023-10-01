@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Any, Tuple
 from abc import ABC, abstractmethod
 
+from yarl import URL
+
 from pykakasi import kakasi
 
 from discord import Interaction, Embed, Member
@@ -135,6 +137,7 @@ class CustomSpotifyTrack(SpotifyTrack):
             async with sp_client.session.get(uri, headers=sp_client.bearer_headers) as resp:
                 if resp.status == 400:
                     return None
+
                 elif resp.status != 200:
                     raise SpotifyRequestError(resp.status, resp.reason)
 
@@ -171,12 +174,14 @@ class CustomSpotifyTrack(SpotifyTrack):
         yt_track: YouTubeTrack = None
         ytms_track: CustomYouTubeMusicTrack = None
 
-        async def __search_based(cls: YouTubeTrack | CustomYouTubeMusicTrack) -> list[YouTubeTrack | CustomYouTubeMusicTrack]:
+        async def __search_based(cls: YouTubeTrack | CustomYouTubeMusicTrack) -> YouTubeTrack | CustomYouTubeMusicTrack:
             tracks: CustomYouTubeMusicTrack | YouTubeTrack = None
             if not self.isrc:
                 tracks: list[cls] = await cls.search(f'{self.name} - {self.artists[0]}')
+
             else:
                 tracks: list[cls] = await cls.search(f'"{self.isrc}"')
+
                 if not tracks:
                     tracks: list[cls] = await cls.search(f'{self.name} - {self.artists[0]}')
 
@@ -185,10 +190,10 @@ class CustomSpotifyTrack(SpotifyTrack):
         def __was_contains_japanese(text: str) -> bool:
             for char in text:
                 if ('\u4e00' <= char <= '\u9fff'  # Kanji
-                    or '\u3040' <= char <= '\u309f'  # Hiragana
-                    or '\u30a0' <= char <= '\u30ff'  # Katakana
-                    or '\u31f0' <= char <= '\u31ff'  # Katakana Phonetic Extensions
-                    or '\uff66' <= char <= '\uff9f'  # Halfwidth Katakana
+                        or '\u3040' <= char <= '\u309f'  # Hiragana
+                        or '\u30a0' <= char <= '\u30ff'  # Katakana
+                        or '\u31f0' <= char <= '\u31ff'  # Katakana Phonetic Extensions
+                        or '\uff66' <= char <= '\uff9f'  # Halfwidth Katakana
                     ):
                     return True
             return False
@@ -216,9 +221,13 @@ class CustomSpotifyTrack(SpotifyTrack):
 
                 data = await resp.json()
 
+            history = set(player.queue) | set(player.auto_queue) | set(
+                    player.auto_queue.history) | {self}
+
             for reco in data['tracks']:
                 reco = CustomSpotifyTrack(reco)
-                if reco in player.auto_queue or reco in player.auto_queue.history:
+
+                if reco in history:
                     continue
 
                 await player.auto_queue.put_wait(reco)
@@ -238,6 +247,7 @@ class CustomSpotifyTrack(SpotifyTrack):
 
         if ytms_track and artist_converted.casefold() in ytms_track.author.casefold():
             self.fetched = ytms_track
+            return
             # return ModularUtil.simple_log(f'Fulfilled {self} with {self.fetched} from {type(self.fetched).__name__}.', )
 
         if yt_track and ('music' in yt_track.title.casefold()
@@ -248,6 +258,7 @@ class CustomSpotifyTrack(SpotifyTrack):
                 data=yt_track.data)
 
         self.fetched = yt_track
+        return
         # return ModularUtil.simple_log(f'Fulfilled {self} with {self.fetched} from {type(self.fetched).__name__}.', )
 
 
@@ -338,14 +349,13 @@ class CustomPlayer(Player):
 
                 for track_ in recos:
                     track_ = CustomYouTubeMusicTrack(
-                        data=track_.data) if was_ytms else YouTubeTrack(data=track_.data)
+                        data=track_.data) if was_ytms else track_
 
                     if track_ in queues:
                         continue
 
                     await self.auto_queue.put_wait(track_)
 
-                self.auto_queue.shuffle()
             except ValueError:
                 pass
 
@@ -354,9 +364,6 @@ class CustomPlayer(Player):
                 await track.fulfill(player=self, populate=populate)
 
             track = track.fetched
-
-            if populate:
-                self.auto_queue.shuffle()
 
             for attr, value in original.__dict__.items():
                 if hasattr(track, attr):
@@ -425,6 +432,18 @@ class TrackType(Enum):
 
             elif 'soundcloud.com' in uri:
                 return cls.SOUNCLOUD
+
+    def is_playlist(self, uri: str):
+        if uri.startswith('http'):
+            url: URL = URL(uri)
+
+            if self is self.SPOTIFY \
+                    and decode_url(uri).type in (SpotifySearchType.playlist, SpotifySearchType.album):
+                return True
+            elif url.query.get('list') or 'sets' in url.path:
+                return True
+
+        return False
 
     def favicon(self) -> str:
         favicon: str = "https://www.google.com/s2/favicons?domain={domain}&sz=256"

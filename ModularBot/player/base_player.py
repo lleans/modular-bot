@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from asyncio import gather, create_task
 
 from yarl import URL
@@ -10,7 +10,9 @@ from discord import (
     TextChannel,
     VoiceClient,
     Guild,
-    Member
+    Member,
+    VoiceState,
+    VoiceProtocol
 )
 from discord.ext import commands, tasks
 from discord.app_commands import check
@@ -27,7 +29,6 @@ from wavelink import (
     Playable,
     Queue
 )
-from wavelink.ext.spotify import decode_url, SpotifySearchType
 
 from .interfaces import (
     CustomPlayer,
@@ -47,57 +48,62 @@ class TrackPlayerDecorator:
     @classmethod
     def is_user_join_checker(cls):
         async def decorator(interaction: Interaction) -> bool:
-            isTrue: bool = True
-            if not interaction.user.voice:
+            user_voice_state: VoiceState = interaction.user.voice
+            guild_voice_client: VoiceProtocol = interaction.guild.voice_client
+
+            if not user_voice_state:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nPlease Join Voice channel first!!", emoji="❌", ephemeral=True)
-                isTrue = False
+                return False
 
-            elif interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
+            elif guild_voice_client and guild_voice_client.channel != user_voice_state.channel:
                 await ModularUtil.send_response(interaction, message="Cannot Join. \nThe bot is already connected to a voice channel!!", emoji="❌", ephemeral=True)
-                isTrue = False
+                return False
 
-            return isTrue
+            return True
 
         return check(decorator)
 
     @classmethod
     def is_user_allowed(cls):
         async def decorator(interaction: Interaction) -> bool:
-            isTrue: bool = True
-            if not interaction.user.voice:
+            user_voice_state: VoiceState = interaction.user.voice
+            guild_voice_client: VoiceProtocol = interaction.guild.voice_client
+
+            if not user_voice_state:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nPlease Join Voice channel first!!", emoji="❌", ephemeral=True)
-                isTrue = False
+                return False
 
-            elif interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
+            elif guild_voice_client and guild_voice_client.channel != user_voice_state.channel:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nPlease join the same Voice Channel with bot!!", emoji="🛑", ephemeral=True)
-                isTrue = False
+                return False
 
-            return isTrue
+            return True
 
         return check(decorator)
 
     @classmethod
     def is_client_exist(cls):
         async def decorator(interaction: Interaction) -> bool:
-            isTrue: bool = True
-            if not interaction.guild.voice_client:
-                await ModularUtil.send_response(interaction, message="Not joined a voice channel", emoji="🛑", ephemeral=True)
-                isTrue = False
+            guild_voice_client: VoiceProtocol = interaction.guild.voice_client
 
-            return isTrue
+            if not guild_voice_client:
+                await ModularUtil.send_response(interaction, message="Not joined a voice channel", emoji="🛑", ephemeral=True)
+                return False
+
+            return True
 
         return check(decorator)
 
     @classmethod
     def is_playing(cls):
         async def decorator(interaction: Interaction) -> bool:
-            isTrue: bool = True
             player: CustomPlayer = interaction.guild.voice_client
+
             if player and player.current is None:
                 await ModularUtil.send_response(interaction, message="Can't do that. \nNothing is playing", emoji="📪")
-                isTrue = False
+                return False
 
-            return isTrue
+            return True
 
         return check(decorator)
 
@@ -114,31 +120,31 @@ class TrackPlayerBase:
     # Begin inner work
     @tasks.loop(seconds=10)
     async def _timeout_check(self) -> None:
+        current_datetime: datetime = ModularUtil.get_time()
+
         for id, key in self.__guilds.items():
-            if ModularUtil.get_time() >= (key['timestamp'] + timedelta(minutes=self.__timeout_minutes)):
+            expired_time: datetime = key['timestamp'] + \
+                timedelta(minutes=self.__timeout_minutes)
+
+            if current_datetime >= expired_time:
                 guild: Guild = self._bot.get_guild(id)
                 client: VoiceClient = guild.voice_client
-                if client and not client.is_playing() and not client.is_paused():
+
+                if client and (
+                    not client.is_playing()
+                    and not client.is_paused()
+                ):
                     await client.disconnect()
 
                 else:
-                    self.__guilds[id]['timestamp'] = ModularUtil.get_time(
-                    )
+                    self.__guilds[id]['timestamp'] = current_datetime
 
     async def _custom_wavelink_player(self, query: str, track_type: TrackType, is_search: bool = False) -> Playable | Playlist | CustomSpotifyTrack | list[CustomSpotifyTrack]:
         """Will return either List of tracks or Single Tracks"""
         tracks: Playable | Playlist | CustomSpotifyTrack | list[CustomSpotifyTrack] = None
-        is_playlist: bool = False
+        is_playlist: bool = track_type.is_playlist(query)
         search_limit: int = 30
         url: URL = None
-
-        if query.startswith('http'):
-            url = URL(query)
-
-            if track_type is TrackType.SPOTIFY and decode_url(query).type in (SpotifySearchType.playlist, SpotifySearchType.album):
-                is_playlist = True
-            elif url.query.get('list') or 'sets' in url.path:
-                is_playlist = True
 
         if track_type in (TrackType.YOUTUBE, TrackType.YOUTUBE_MUSIC):
             if is_playlist:
@@ -164,6 +170,7 @@ class TrackPlayerBase:
         elif track_type is TrackType.SPOTIFY:
             tracks: list[CustomSpotifyTrack] = list()
             tracks = await CustomSpotifyTrack.search(query)
+
 
         if is_search:
             tracks = tracks[0:search_limit]
@@ -214,7 +221,7 @@ class TrackPlayerBase:
 
         if isinstance(track, list):
             # Session from aiohttp bot main
-            raw_data_spotify = await UtilTrackPlayer.get_raw_spotify_playlist(self._bot.session, uri)
+            raw_data_spotify = await UtilTrackPlayer.get_raw_spotify_playlist(uri)
 
         if is_playlist:
             playlist: Playlist | list[CustomSpotifyTrack] = track
