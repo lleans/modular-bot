@@ -52,12 +52,13 @@ class UtilTrackPlayer:
         return data
 
     @staticmethod
-    def extract_index_youtube(url: URL) -> int:
+    def extract_index_youtube(q: str) -> int:
         index: int = None
-        if url.query.get('start_radio'):
-            index = int(url.query.get('start_radio'))
-        elif url.query.get('index'):
-            index = int(url.query.get('index'))
+
+        if q.startswith('http'):
+            url = URL(q)
+            index = int(url.query.get('start_radio')) or int(
+                url.query.get('index'))
 
         return index
 
@@ -113,17 +114,17 @@ class MusixMatchAPI:
     def __was_contains_japanese(self, text: str) -> bool:
         for char in text:
             if ('\u4e00' <= char <= '\u9fff'  # Kanji
-                or '\u3040' <= char <= '\u309f'  # Hiragana
-                or '\u30a0' <= char <= '\u30ff'  # Katakana
-                or '\u31f0' <= char <= '\u31ff'  # Katakana Phonetic Extensions
-                or '\uff66' <= char <= '\uff9f'  # Halfwidth Katakana
-                ):
+                    or '\u3040' <= char <= '\u309f'  # Hiragana
+                    or '\u30a0' <= char <= '\u30ff'  # Katakana
+                    or '\u31f0' <= char <= '\u31ff'  # Katakana Phonetic Extensions
+                    or '\uff66' <= char <= '\uff9f'  # Halfwidth Katakana
+                    ):
                 return True
         return False
-    
+
     async def __fulfill_with_spotify(self) -> None:
         spot: list[CustomSpotifyTrack] = await CustomSpotifyTrack.search(
-            query=f'{self.__track.title} - {self.__track.author}',
+            query=self.__track.title,
             limit=1
         )
         self.__track = spot[0]
