@@ -10,7 +10,7 @@ from config import ModularBotConst
 class Prayers:
     __PRAYER_LOCATION = "DKI Jakarta"
 
-    __PRAYER_API = "https://muslim-pro-api-lleans.koyeb.app"
+    __PRAYER_API = "https://muslimpro-scrapper.lleans.dev"
     __BUKA_IMAGE = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",
                     "https://i.imgur.com/eWe8VvA.gif", "https://i.imgur.com/gFVKP74.gif",
                     "https://i.imgur.com/tW3Hjcb.gif", "https://i.imgur.com/ey1KKAd.gif",
