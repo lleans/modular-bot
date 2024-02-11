@@ -23,8 +23,8 @@ from discord import (
 )
 from discord.app_commands import guild_only
 from aiohttp import ClientSession
-from wavelink import Node, NodePool
-from wavelink.ext.spotify import SpotifyClient
+
+from wavelink import Node, Pool
 
 from config import (
     GuildChannel,
@@ -46,7 +46,6 @@ class ModularBotTask:
     _praytimes: dict
 
     async def _begin_loop_task(self):
-        await self._pull_data()
 
         if not self._pull_data.is_running():
             self._pull_data.start()
@@ -70,39 +69,32 @@ class ModularBotTask:
             ramadhan_end: datetime = datetime.strptime(
                 f"{self._praytimes['ramadhan']['end']} {time.strftime('%Y')}", "%B %d %Y")
 
-            if ramadhan_start.date() <= time.date() < ramadhan_end.date():
-                role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
-                channel: TextChannel = self.get_channel(
-                    GuildChannel.PRAYER_CHANNEL)
+            role: Role = self._guild.get_role(GuildRole.THE_MUSKETEER)
+            channel: TextChannel = self.get_channel(
+                GuildChannel.PRAYER_CHANNEL)
+            overwrites = channel.overwrites_for(role)
 
+            if ramadhan_start.date() <= time.date() < ramadhan_end.date():
                 if self._praytime_message is not None and (time.date() - timedelta(days=1)).day == (self._praytime_message.created_at + timedelta(hours=7)).day:
                     self._praytime_message = None
-
-                overwrites = channel.overwrites_for(self._role)
-
-                if not overwrites.view_channel:
-                    await channel.set_permissions(role, view_channel=True)
 
                 self._is_ramadhan = True
 
             else:
                 self._is_ramadhan = False
                 self._praytime_message = None
-                await channel.set_permissions(role, view_channel=False)
+
+            if overwrites.view_channel is not self._is_ramadhan:
+                await channel.set_permissions(role, view_channel=True)
 
     @staticmethod
-    async def _connect_nodes(bot: commands.Bot) -> None:
+    async def _connect_nodes_lavalink(bot: commands.Bot) -> None:
         await bot.wait_until_ready()
-        spotify_client: SpotifyClient = SpotifyClient(
-            client_id=ModularBotConst.SPOTIFY_CLIENT,
-            client_secret=ModularBotConst.SPOTIFY_SECRET
-        )
+        inactive_timeout: int = timedelta(minutes=30).total_seconds()
 
-        node: Node = Node(
-            uri=ModularBotConst.LAVALINK_SERVER,
-            password=ModularBotConst.LAVALINK_PASSWORD
-        )
-        await NodePool.connect(client=bot, nodes=[node], spotify=spotify_client)
+        nodes: list[Node] = [Node(uri=ModularBotConst.LAVALINK_SERVER, password=ModularBotConst.LAVALINK_PASSWORD, inactive_player_timeout=inactive_timeout)]
+
+        await Pool.connect(nodes=nodes, client=bot, cache_capacity=20)
 
     @tasks.loop(hours=3)
     async def _pull_data(self) -> None:
@@ -135,7 +127,7 @@ class ModularBotTask:
             for channel in self._guild.text_channels:
                 channel: TextChannel = channel
                 overwrites = channel.overwrites_for(self._role)
-                
+
                 if channel.is_nsfw() and channel.id != GuildChannel.BINCANG_HARAM_CHANNEL and overwrites.view_channel != view_channel:
                     await channel.set_permissions(self._role, view_channel=view_channel)
                     await sleep(2)
@@ -143,8 +135,8 @@ class ModularBotTask:
             return
 
         if self._praytimes and self._is_ramadhan:
-            imsak: str = self._praytimes['Subuh']
-            buka: str = self._praytimes['Maghrib']
+            imsak: str = self._praytimes.get('Subuh')
+            buka: str = self._praytimes.get('Maghrib')
             imsak: datetime = datetime.strptime(
                 imsak, '%H:%M') - timedelta(minutes=10)
             buka: datetime = datetime.strptime(buka, '%H:%M')
@@ -156,20 +148,18 @@ class ModularBotTask:
                 await _do_the_lockdown(view_channel=False)
 
         else:
-            if time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['end']:
+            if time.strftime('%A-%H') == ModularBotConst.LockDownTime.END:
                 await _do_the_lockdown(view_channel=True)
 
-            elif time.strftime('%A-%H') == ModularBotConst.LOCKDOWN_TIME['start']:
+            elif time.strftime('%A-%H') == ModularBotConst.LockDownTime.START:
                 await _do_the_lockdown(view_channel=False)
 
     @tasks.loop(seconds=30)
-    async def _change_activity(self) -> None:
+    async def _change_activity(self: commands.Bot) -> None:
         the_musketter_count: int = len(
             self._guild.get_role(GuildRole.THE_MUSKETEER).members)
 
         async def a() -> None:
-            the_musketter_count: int = len(
-                self._guild.get_role(GuildRole.THE_MUSKETEER).members)
             await self.change_presence(activity=Activity(type=ActivityType.watching, name=f"{the_musketter_count} Hamba Allah"))
 
         async def b() -> None:
@@ -191,13 +181,13 @@ class ModularBotBase(commands.Bot):
     async def _help_embed(self) -> Embed:
         desc: str = f"Here's a few feature that's available on {ModularBotConst.SERVER_NAME}."
         embed: Embed = Embed(title=f"Menu {ModularBotConst.SERVER_NAME}",
-                             description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.COLOR['random_array'])))
+                             description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.Color.RANDOM)))
 
         for command in await self.tree.fetch_commands():
             if command.description:
                 embed.add_field(name=f"**/{command.name}**",
                                 value=command.description, inline=True)
-                
+
             else:
                 embed.add_field(name=f"**{command.name}**",
                                 value="Access it through Apps Command", inline=True)
@@ -275,13 +265,15 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
             GuildChannel.WELCOME_CHANNEL)
         image_file: File = File(
             BytesIO(welcome_banner.getbuffer()), filename='image.png')
-        await welcome_channel.send(file=image_file)
+        await wait([
+            create_task(welcome_channel.send(file=image_file)),
+            create_task(self._analytics())
+        ])
 
-        await self._analytics()
         try:
             return await member.send(GuildMessage.DM_MESSAGE)
         except errors.Forbidden:
-            pass
+            return
 
     async def on_member_remove(self, member: Member) -> None:
         leave_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.avatar.url, is_welcome=False)
@@ -291,14 +283,16 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         image_file: File = File(
             BytesIO(leave_banner.getbuffer()), filename='image.png')
 
-        await self._analytics()
-        return await leave_channel.send(file=image_file)
+        return await wait([
+            create_task(self._analytics()),
+            create_task(leave_channel.send(file=image_file))
+        ])
 
     async def on_message(self, message: Message) -> None:
         if message.author == self.user:
             return
 
-        elif self.user.mentioned_in(message=message) and search(rf"<@{self.user.id}>|<@!{self.user.id}>", message.content, flags=IGNORECASE):
+        elif self.user.mentioned_in(message=message) and self.user.mention in message.content:
             await message.channel.send(embed=await self._help_embed())
 
         # TODO Need fix
@@ -313,7 +307,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         self._praytime_message: Message = None
         ModularUtil.setup_log()
 
-        self.loop.create_task(self._connect_nodes(self))
+        self.loop.create_task(self._connect_nodes_lavalink(self))
 
         await self.load_extension('ModularBot.command')
 
@@ -350,6 +344,11 @@ async def _help(interaction: Interaction) -> None:
 @guild_only()
 async def _ping(interaction: Interaction) -> None:
     where: str = await ModularUtil.get_geolocation(bot.session)
-    await ModularUtil.send_response(interaction, message=f":cloud: Ping {round(bot.latency * 1000)}ms, server location {where} :earth_americas:", ephemeral=True)
+    message: str = "Something wnet wrong on our side."
+
+    if where is not None:
+        message = f":cloud: Ping {round(bot.latency * 1000)}ms, server location {where} :earth_americas:"
+
+    await ModularUtil.send_response(interaction, message=message, ephemeral=True)
 
 bot.run(token=ModularBotConst.TOKEN.strip())

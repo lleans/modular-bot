@@ -47,11 +47,11 @@ class ModularUtil:
     @classmethod
     async def get_geolocation(cls, session: ClientSession) -> str:
         async with session.get(cls.__IP_GEOLOCATION_URL) as resp:
-            if (resp.status == 200):
-                resp = await resp.json()
-                return f"{resp['city']}, {resp['regionName']}, {resp['country']}"
+            if resp.status == 200:
+                temp: dict = await resp.json()
+                return f"{temp.get('city', None)}, {temp.get('regionName', None)}, {temp.get('country', None)}"
             else:
-                return
+                return None
 
     @staticmethod
     def setup_log():
@@ -108,13 +108,13 @@ class ModularUtil:
 
         if is_welcome:
             title: str = "Welcome".upper()
-            mssg: str = GuildMessage.BANNER['welcome_banner'].upper()
-            banner: str = ModularBotConst.IMAGE['welcome_banner']
+            mssg: str = GuildMessage.Banner.WELCOME.upper()
+            banner: str = ModularBotConst.Image.WELCOME_BANNER
 
         else:
             title = "Goodbye".upper()
-            mssg = GuildMessage.BANNER['leave_banner'].upper()
-            banner: str = ModularBotConst.IMAGE['leave_banner']
+            mssg = GuildMessage.Banner.LEAVE.upper()
+            banner: str = ModularBotConst.Image.LEAVE_BANNER
 
         profile_size: int = 2.2
 

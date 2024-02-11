@@ -2,29 +2,14 @@ version: "3.9"
 
 services:
   lavalink:
-    image: fredboat/lavalink:3
+    image: ghcr.io/lavalink-devs/lavalink:4
     environment:
-      SERVER_PORT: 2333
-      SERVER_ADDRESS: 0.0.0.0
-      LAVALINK_SERVER_PASSWORD: "youshallnotpass"
-      LAVALINK_SERVER_SOURCES_YOUTUBE: 'true'
-      LAVALINK_SERVER_SOURCES_BANDCAMP: 'false'
-      LAVALINK_SERVER_SOURCES_SOUNDCLOUD: 'true'
-      LAVALINK_SERVER_SOURCES_TWITCH: 'false'
-      LAVALINK_SERVER_SOURCES_VIMEO: 'false'
-      LAVALINK_SERVER_SOURCES_HTTP: 'true'
-      LAVALINK_SERVER_SOURCES_LOCAL: 'false'
-      LAVALINK_SERVER_BUFFER_DURATION_MS: 400
-      LAVALINK_SERVER_FRAME_BUFFER_DURATIONS_MS: 5000
-      LAVALINK_SERVER_TRACK_STRUCK_THRESHOLD_MS: 10000
-      LAVALINK_SERVER_YOUTUBE_PLAYLIST_LOAD_LIMIT: 6
-      LAVALINK_SERVER_PLAYER_UPDATE_INTERVAL: 5
-      LAVALINK_SERVER_YOUTUBE_SEARCH_ENABLED: 'true'
-      LAVALINK_SERVER_SOUNDCLOUD_SEARCH_ENABLED: 'true'
-      LAVALINK_SERVER_YOUTUBE_CONFIG_EMAIL: ${YOUTUBE_EMAIL}
-      LAVALINK_SERVER_YOUTUBE_CONFIG_PASSWORD: ${YOUTUBE_PASSWORD}
+      # SERVER NODE CONFIG
+      - SERVER_PORT = 2333
+      - LAVALINK_SERVER_PASSWORD = youshallnotpass
     volumes:
       - ./Lavalink/application.yml:/opt/Lavalink/application.yml
+      - ./Lavalink/plugins/:/opt/Lavalink/plugins/
     restart: on-failure
 
   bot:
@@ -36,4 +21,3 @@ services:
       - lavalink
     env_file:
       - .env
-  

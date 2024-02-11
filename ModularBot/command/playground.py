@@ -11,23 +11,42 @@ class Playground(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self._bot: commands.Bot = bot
-        self.ctx_menu = ContextMenu(
+        self.ctx_avatar = ContextMenu(
             name="Avatar",
             callback=self._avatar
         )
-        self._bot.tree.add_command(self.ctx_menu)
+        self._bot.tree.add_command(self.ctx_avatar)
+        #TODO Got rate limited
+        # self.ctx_banner = ContextMenu(
+        #     name="Banner",
+        #     callback=self._banner
+        # )
+        # self._bot.tree.add_command(self.ctx_banner)
         super().__init__()
 
     async def _avatar(self, interaction: Interaction, user: Member):
         await interaction.response.defer(ephemeral=True)
 
         embed: Embed = Embed(color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']), timestamp=ModularUtil.get_time())
+            ModularBotConst.Color.SUCCESS), timestamp=ModularUtil.get_time())
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f'From {interaction.user.display_name}', icon_url=interaction.user.display_avatar)
         embed.set_image(
-            url=user.guild_avatar.url if user.guild_avatar is not None else user.avatar.url)
-        embed.description = f"Showing avatar of <@{user.id}>"
+            url=user.display_avatar.url)
+        embed.description = f"Showing avatar of {user.mention}"
+
+        await ModularUtil.send_response(interaction, embed=embed)
+
+    async def _banner(self, interaction: Interaction, user: Member):
+        await interaction.response.defer(ephemeral=True)
+
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.Color.SUCCESS), timestamp=ModularUtil.get_time())
+        embed.set_footer(
+            text=f'From {interaction.user.display_name}', icon_url=interaction.user.display_avatar)
+        embed.set_image(
+            url=user.banner)
+        embed.description = f"Showing banner of {user.mention}"
 
         await ModularUtil.send_response(interaction, embed=embed)
 

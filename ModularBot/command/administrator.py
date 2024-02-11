@@ -53,26 +53,32 @@ class Administrator(commands.Cog):
         temp: Message = await ModularUtil.send_response(interaction, message=f"**{amount}** message purged", emoji="✅")
         await temp.delete(delay=3)
 
+    #TODO Built an raffle code
+    # @command(name='raffle', description='Do an raffle')
+    # @checks.has_permissions(manage_messages=True)
+    # async def _raffle(self, interaction: Interaction, member: Member) -> None:
+    #     pass
+
     @checks.has_permissions(administrator=True)
     async def _add_magician(self, interaction: Interaction, user: Member):
         await interaction.response.defer(ephemeral=True)\
 
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']))
+            ModularBotConst.Color.SUCCESS))
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f"From {interaction.user.name}", icon_url=interaction.user.display_avatar)
         guild: Guild = self._bot._guild
         role: Role = guild.get_role(GuildRole.MAGICIAN)
         is_exist: Role = user.get_role(GuildRole.MAGICIAN)
 
         if not is_exist:
             await user.add_roles(role)
-            embed.description = f"Succesfully added <@&{role.id}> to user <@{user.id}>"
+            embed.description = f"Succesfully added {role.mention} to user {user.mention}"
 
         else:
             embed.color = ModularUtil.convert_color(
-                ModularBotConst.COLOR['failed'])
-            embed.description = f"User <@{user.id}> already had role <@&{role.id}>"
+                ModularBotConst.Color.FAILED)
+            embed.description = f"User {user.mention} already had role {role.mention}"
 
         await ModularUtil.send_response(interaction, embed=embed)
 
@@ -81,7 +87,7 @@ class Administrator(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']))
+            ModularBotConst.Color.SUCCESS))
         embed.set_footer(
             text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
         guild: Guild = self._bot._guild
@@ -90,12 +96,12 @@ class Administrator(commands.Cog):
 
         if not is_exist:
             await user.add_roles(role)
-            embed.description = f"Succesfully added <@&{role.id}> to user <@{user.id}>"
+            embed.description = f"Succesfully added {role.mention} to user {user.mention}"
 
         else:
             embed.color = ModularUtil.convert_color(
-                ModularBotConst.COLOR['failed'])
-            embed.description = f"User <@{user.id}> already had role <@&{role.id}>"
+                ModularBotConst.Color.FAILED)
+            embed.description = f"User {user.mention} already had role {role.mention}"
 
         await ModularUtil.send_response(interaction, embed=embed)
 
@@ -104,18 +110,18 @@ class Administrator(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']))
+            ModularBotConst.Color.SUCCESS))
         embed.set_footer(
             text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
         is_exist: Role = user.get_role(GuildRole.MAGICIAN)
 
         if is_exist:
             await user.remove_roles(is_exist)
-            embed.description = f"Succesfully revoke <@&{GuildRole.MAGICIAN}> from user <@{user.id}>"
+            embed.description = f"Succesfully revoke {is_exist.mention} from user {user.mention}"
         else:
             embed.color = ModularUtil.convert_color(
-                ModularBotConst.COLOR['failed'])
-            embed.description = f"<@{user.id}> does not have role <@&{GuildRole.MAGICIAN}>"
+                ModularBotConst.Color.FAILED)
+            embed.description = f"{user.mention} does not have role <@&{GuildRole.MAGICIAN}>"
 
         await ModularUtil.send_response(interaction, embed=embed)
 
@@ -124,19 +130,19 @@ class Administrator(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
-            ModularBotConst.COLOR['success']))
+            ModularBotConst.Color.SUCCESS))
         embed.set_footer(
             text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
         is_exist: Role = user.get_role(GuildRole.THE_MUSKETEER)
 
         if is_exist:
             await user.remove_roles(is_exist)
-            embed.description = f"Succesfully revoke <@&{GuildRole.THE_MUSKETEER}> from <@{user.id}>"
+            embed.description = f"Succesfully revoke {is_exist.mention} from {user.mention}"
 
         else:
             embed.color = ModularUtil.convert_color(
-                ModularBotConst.COLOR['failed'])
-            embed.description = f"<@{user.id}> does not have role <@&{GuildRole.THE_MUSKETEER}>"
+                ModularBotConst.Color.FAILED)
+            embed.description = f"{user.mention} does not have role <@&{GuildRole.THE_MUSKETEER}>"
 
         await ModularUtil.send_response(interaction, embed=embed)
 

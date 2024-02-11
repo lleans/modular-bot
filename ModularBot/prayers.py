@@ -11,11 +11,11 @@ class Prayers:
     __PRAYER_LOCATION = "DKI Jakarta"
 
     __PRAYER_API = "https://muslimpro-scrapper.lleans.dev"
-    __BUKA_IMAGE = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",
-                    "https://i.imgur.com/eWe8VvA.gif", "https://i.imgur.com/gFVKP74.gif",
-                    "https://i.imgur.com/tW3Hjcb.gif", "https://i.imgur.com/ey1KKAd.gif",
-                    "https://i.imgur.com/Tgx5w3E.gif"]
-    __SHALAT_IMAGE = ["https://i.imgur.com/I24KR5n.gif", "https://i.imgur.com/L2Yk6a2.gif",
+    __EATS_IMAGES = ["https://i.imgur.com/1uVOu9s.gif", "https://i.imgur.com/lrrIzRY.gif",
+                     "https://i.imgur.com/eWe8VvA.gif", "https://i.imgur.com/gFVKP74.gif",
+                     "https://i.imgur.com/tW3Hjcb.gif", "https://i.imgur.com/ey1KKAd.gif",
+                     "https://i.imgur.com/Tgx5w3E.gif"]
+    __CHEER_IMAGES = ["https://i.imgur.com/I24KR5n.gif", "https://i.imgur.com/L2Yk6a2.gif",
                       "https://i.imgur.com/cRJQcfJ.gif", "https://i.imgur.com/IV5Nadb.gif",
                       "https://i.imgur.com/zCSohsn.gif", "https://i.imgur.com/OGesUM4.gif",
                       "https://i.imgur.com/VTPufTo.gif"]
@@ -35,10 +35,12 @@ class Prayers:
         while not res:
             async with session.get(cls.__PRAYER_API+"/"+cls.__PRAYER_LOCATION) as resp:
                 if resp.status == 200:
-                    resp: dict = await resp.json()
+                    temp: dict = await resp.json()
+
                     time: datetime = ModularUtil.get_time()
+                    cur_date: str = f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"
                     res.update(
-                        resp['praytimes'][f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"])
+                        dict(temp.get('praytimes')).get(cur_date, {}))
                     res.update({
                         'Maghrib': res.pop('Maghrib'),
                         'Subuh': res.pop('Fajr'),
@@ -46,7 +48,7 @@ class Prayers:
                         'Dzuhur': res.pop('Dhuhr'),
                         'Ashar': res.pop('Asr'),
                         'Isya': res.pop("Isha'a"),
-                        'ramadhan': resp['ramadhan'][time.strftime('%Y')],
+                        'ramadhan': dict(temp.get('ramadhan')).get(time.strftime('%Y'), {}),
                     })
                 else:
                     raise Exception("API problem")
@@ -56,7 +58,7 @@ class Prayers:
     @classmethod
     def prayers_generator(cls, praytimes: dict, time: datetime) -> Embed | None:
         e: Embed = Embed(color=ModularUtil.convert_color(
-            choice(ModularBotConst.COLOR['random_array'])), title=None)
+            choice(ModularBotConst.Color.RANDOM)), title=None)
         e.set_author(name="Muslim Pro",
                      icon_url="https://i.imgur.com/T7Zqnzw.png")
         e.description = f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal salat hari ini:**"
@@ -67,13 +69,13 @@ class Prayers:
                 pray = "Jumatan"
 
             if prayt == time.strftime('%H:%M'):
-                e.set_image(url=choice(cls.__SHALAT_IMAGE))
+                e.set_image(url=choice(cls.__CHEER_IMAGES))
 
                 if pray == "Maghrib":
                     e.title = f"Waktu Berbuka untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
                     e.description = "Selamat Berbuka Puasa. Bersyukurlah kalian bisa berbuka dengan makanan enak, diluar sana masih banyak yang belum bisa kayak kamu. " \
                         "Jadi, tetaplah bersyukur walaupun kamu buka dengan tahu tempe :).\nJangan lupa Salat Maghrib habis buka.\n\n" + e.description
-                    e.set_image(url=choice(cls.__BUKA_IMAGE))
+                    e.set_image(url=choice(cls.__EATS_IMAGES))
 
                 elif pray == "Isya":
                     e.title = f"Waktu Salat Tarawih untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
@@ -82,7 +84,7 @@ class Prayers:
                 else:
                     e.title = f"Waktu Salat {pray} untuk area {cls.__PRAYER_LOCATION} dan sekitarnya."
                     e.description = f"Waktunya Salat {pray}. Salat yang khusyuk, biar bisa ketemu waifu di isekaid.\n\n" + e.description
-                    
+
             if pray != "ramadhan":
                 e.add_field(
                     name=f"{pray+' (Buka)' if pray == 'Maghrib' else pray}:", value=prayt)

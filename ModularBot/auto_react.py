@@ -57,6 +57,6 @@ class Reaction:
                     rand_express: str = choice(
                         cls.__BAD_EXPRESSION) if type == "bad_words" or type == "stress" else choice(cls.__GOOD_EXPRESSION)
                     e: Embed = Embed(title=exprss, description=rand_express, color=ModularUtil.convert_color(
-                        choice(ModularBotConst.COLOR['random_array'])))
+                        choice(ModularBotConst.Color.RANDOM)))
                     return e
                 return exprss
