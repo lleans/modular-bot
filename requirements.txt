@@ -1,5 +1,5 @@
 aiocache==0.12.2
-aiohttp==3.9.3
+aiohttp==3.9.1
 aiosignal==1.3.1
 async-timeout==4.0.3
 attrs==23.2.0
@@ -10,7 +10,7 @@ discord.py==2.3.2
 easy-pil==0.3.3
 frozenlist==1.4.1
 idna==3.6
-LyricsFindScrapper @ git+https://github.com/lleans/lyricfind-scrapper.git@e0c21ac947a8bf0e982bfa6a58d5f96c7d129dab
+LyricsFindScrapper @ git+https://github.com/lleans/lyricfind-scrapper.git@3e7d8f617b41785a95e7d6d731ddb70d1046a955
 multidict==6.0.5
 Pillow==10.1.0
 pycparser==2.21
