@@ -10,10 +10,10 @@ from re import sub
 from yarl import URL
 
 from discord import (
-    Client, 
-    Interaction, 
-    Embed, 
-    Member, 
+    Client,
+    Interaction,
+    Embed,
+    Member,
     Message
 )
 from discord.abc import Connectable
@@ -37,7 +37,6 @@ from wavelink.enums import NodeStatus, QueueMode
 from wavelink.payloads import TrackEndEventPayload
 
 
-
 class CustomYouTubeMusicPlayable(Playable):
 
     def __init__(self, data, *, playlist: PlaylistInfo | None = None) -> None:
@@ -59,9 +58,58 @@ class CustomPlayer(Player):
         super().__init__(client, channel, nodes=nodes)
         self.__previous_seeds: Queue[str] = Queue(
             maxsize=self._previous_seeds_cutoff)
-        
+
         self.interaction: Interaction = None
         self.message: Message = None
+
+        # TODO Filter list
+        self.karaoke_filter: bool = False
+        self.rotation_filter: bool = False
+        self.tremolo_filter: bool = False
+        self.vibrato_filter: bool = False
+
+        # TODO Filter template list
+        self.nigthcore_filter: bool = False
+        self.vaporwave_filter: bool = False
+        self.bass_boost_filter: bool = False
+        self.soft_filter: bool = False
+        self.pop_filter: bool = False
+        self.treble_bass: bool = False
+
+    def reset_filter(self) -> None:
+        # TODO Filter list
+        self.karaoke_filter: bool = False
+        self.rotation_filter: bool = False
+        self.tremolo_filter: bool = False
+        self.vibrato_filter: bool = False
+
+        # TODO Filter template list
+        self.nigthcore_filter: bool = False
+        self.vaporwave_filter: bool = False
+        self.bass_boost_filter: bool = False
+        self.soft_filter: bool = False
+        self.pop_filter: bool = False
+        self.treble_bass: bool = False
+
+    def reset_inner_work(self) -> None:
+        self.interaction = None
+        self.message = None
+
+        self.reset_filter()
+
+    def current_filter_state(self) -> dict:
+        return dict({
+            'karaoke': self.karaoke_filter,
+            'rotation': self.rotation_filter,
+            'tremolo': self.tremolo_filter,
+            'vibrato': self.vibrato_filter,
+            'nightcore': self.nigthcore_filter,
+            'vaporwave': self.vaporwave_filter,
+            'bass boost': self.bass_boost_filter,
+            'soft': self.soft_filter,
+            'pop': self.pop_filter,
+            'treble bass': self.treble_bass
+        })
 
     # TODO Create YTMusic Converter
     async def covert_into_ytm(self, playable: Playable):
@@ -72,9 +120,10 @@ class CustomPlayer(Player):
         except:
             return CustomYouTubeMusicPlayable(data=playable.raw_data, playlist=playable.playlist)
 
-    # TODO FUlfill spotify info empty
+    # TODO Fulfill spotify info empty
     async def fulfill_spotify(self, playable: Playable):
         try:
+
             if playable.source == 'spotify':
                 conv: Playable = await Pool.fetch_tracks(playable.uri)
             else:
@@ -154,8 +203,8 @@ class CustomPlayer(Player):
     async def _do_recommendation(self):
         assert self.guild is not None
         assert self.queue.history is not None and self.auto_queue.history is not None
-        
-        #TODO get rec. only when lower than cuttof
+
+        # TODO get rec. only when lower than cuttof
         if self.queue.count > self._auto_cutoff:
             return
 
@@ -406,7 +455,7 @@ class CustomPlayer(Player):
             tmp: Playable = await self.fulfill_spotify(track)
             track._isrc = tmp.isrc
 
-        #TODO Reasign track
+        # TODO Reasign track
         if replace or not self._current:
             self._current = track
             self._original = track
@@ -453,12 +502,21 @@ class CustomPlayer(Player):
         # TODO Begin searching next isrc
         create_task(_cache_isrc(self.queue))
         create_task(_cache_isrc(self.auto_queue))
-        
+
         # TODO Begin fulfill in background
         create_task(_cache_fulfill_sp(self.queue))
         create_task(_cache_fulfill_sp(self.auto_queue))
 
         return track
+
+
+class FiltersTemplate(Enum):
+    NIGHT_CORE = 1
+    VAPOR_WAVE = 2
+    BASS_BOOST = 3
+    SOFT = 4
+    POP = 5
+    TREBLE_BASS = 6
 
 
 class TrackType(Enum):

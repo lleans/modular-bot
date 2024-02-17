@@ -74,12 +74,20 @@ class TrackView(View):
         track_type: TrackType = TrackType.what_type(track.uri)
         embed.set_author(name=str(track_type.name).replace(
             "_", " ").title(), icon_url=track_type.favicon())
-        
+
         if self.__is_loop_queue:
             embed.add_field(
                 name="Loop Queue",
                 value="Active"
             )
+
+        for key, val in self.__player.current_filter_state().items():
+            if bool(val):
+                embed.add_field(
+                    name=f"{str(key).capitalize()} Filter",
+                    value=str(val),
+                    inline=True
+                )
 
         embed.set_thumbnail(url=track.artist.artwork)
         embed.set_image(url=self.__player.current.artwork)
@@ -204,7 +212,7 @@ class SelectViewSubtitle(View):
                 domain='lyricfind.com')
         )
         song_data: SongData = None
-        
+
         try:
             if not self.__track:
                 self.__track = await self.__lf_client.get_track(trackid=f'isrc:{self.__playable.isrc}')
@@ -214,16 +222,18 @@ class SelectViewSubtitle(View):
                 if not self.__available_lang:
                     self.__available_lang.append(song_data.language)
                     if song_data.available_translations:
-                        self.__available_lang.extend(song_data.available_translations)
+                        self.__available_lang.extend(
+                            song_data.available_translations)
 
-                    self.__available_lang = [[x, choice(self.__rand_emoji)] for x in self.__available_lang]
+                    self.__available_lang = [
+                        [x, choice(self.__rand_emoji)] for x in self.__available_lang]
 
                 self.__lyrics = song_data.lyrics
         except (LFException, Exception) as e:
             embed.description = f'```arm\n{e}\n```'
             self.clear_items()
             return embed
-        
+
         self.__pass_data_to_option()
         embed.title = f"🎼 Lyrics of {self.__track.title} - {self.__track.artist}"
         embed.description = self.__lyrics
@@ -236,7 +246,7 @@ class SelectViewSubtitle(View):
             self.clear_items()
         else:
             self._selector.options.clear()
-        
+
         index_target: int = 0
 
         if self.__target_lang:
@@ -255,7 +265,7 @@ class SelectViewSubtitle(View):
                 description=desc,
                 value=str(index)
             ))
-    
+
         self._selector.options[index_target].default = True
 
     def __update_state_selected(self) -> None:

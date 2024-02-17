@@ -98,13 +98,14 @@ class TrackPlayerDecorator:
             return True
 
         return check(decorator)
-    
+
     @classmethod
     def record_interaction(cls):
         def decorator(func):
             @wraps(func)
             def wrapper(self, interaction: Interaction, *args, **kwargs) -> None:
-                player: CustomPlayer = cast(CustomPlayer, interaction.guild.voice_client)
+                player: CustomPlayer = cast(
+                    CustomPlayer, interaction.guild.voice_client)
                 player.interaction = interaction
 
                 return func(self, interaction, *args, **kwargs)
@@ -119,7 +120,6 @@ class TrackPlayerBase:
     def __init__(self) -> None:
         super().__init__()
 
-    # TODO Spotify fix
     async def _custom_wavelink_searcher(self, query: str, track_type: TrackType, is_search: bool = False) -> Playable | Playlist:
         """Will return either List of tracks or Single Tracks"""
         tracks: Search = None
