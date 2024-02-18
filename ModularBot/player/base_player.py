@@ -23,7 +23,8 @@ from wavelink import (
     Search,
     TrackStartEventPayload,
     WebsocketClosedEventPayload,
-    TrackEndEventPayload
+    TrackEndEventPayload,
+    TrackExceptionEventPayload
 )
 
 from .interfaces import TrackType, CustomYouTubeMusicPlayable, CustomPlayer
@@ -132,13 +133,7 @@ class TrackPlayerBase:
             return CustomYouTubeMusicPlayable(data=trck.raw_data, playlist=trck.playlist)
 
         if was_youtube:
-            tracks = await Playable.search(query, source=TrackSource.YouTubeMusic if track_type is TrackType.YOUTUBE_MUSIC else TrackSource.YouTube)
-
-            if track_type is TrackType.YOUTUBE_MUSIC:
-                if is_playlist:
-                    tracks.tracks = list(map(_into_custom_ytms, tracks))
-                else:
-                    tracks = list(map(_into_custom_ytms, tracks))
+            tracks = await Playable.search(query, source=TrackSource.YouTube if not track_type is TrackType.YOUTUBE_MUSIC else TrackSource.YouTubeMusic)
 
         elif track_type is TrackType.SOUNCLOUD:
             tracks = await Playable.search(query, source=TrackSource.SoundCloud)
@@ -146,18 +141,28 @@ class TrackPlayerBase:
         elif track_type is TrackType.SPOTIFY:
             tracks = await Playable.search(query, source='spsearch')
 
+        # TODO Logic here
+        if is_playlist:
+            tracks.url = query
+
         if is_playlist and was_youtube:
+            if track_type is TrackType.YOUTUBE_MUSIC:
+                tracks.tracks = list(map(_into_custom_ytms, tracks.tracks))
+
             index: int = UtilTrackPlayer.extract_index_youtube(q=query)
             tracks = tracks[index-1] if index else tracks
 
         elif is_search and not is_playlist:
             tracks = tracks[0:search_limit]
 
+            if track_type is TrackType.YOUTUBE_MUSIC:
+                tracks = list(map(_into_custom_ytms, tracks))
+
         elif not is_playlist:
             tracks = tracks[0]
 
-        if is_playlist:
-            tracks.url = query
+            if track_type is TrackType.YOUTUBE_MUSIC:
+                tracks = CustomYouTubeMusicPlayable(data=tracks.raw_data, playlist=tracks.playlist)
 
         return tracks
 
@@ -252,3 +257,17 @@ class TrackPlayerBase:
     @commands.Cog.listener()
     async def on_wavelink_inactive_player(self, player: CustomPlayer) -> None:
         await player.disconnect()
+
+    @commands.Cog.listener()
+    async def on_wavelink_track_exception(self, payload: TrackExceptionEventPayload) -> None:
+        player: CustomPlayer = cast(CustomPlayer, payload.player)
+
+        embed: Embed = Embed(
+            title="💥Something went wrong, while playing the track!",
+            description=f'```arm\n{payload.exception}\n```',
+            color=ModularUtil.convert_color(ModularBotConst.Color.FAILED),
+            timestamp=ModularUtil.get_time()
+        )
+        embed.set_footer(text="LavaLink Node problem")
+
+        await ModularUtil.send_response(player.interaction, embed=embed)
