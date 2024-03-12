@@ -75,7 +75,9 @@ class ModularBotTask:
             overwrites = channel.overwrites_for(role)
 
             if ramadhan_start.date() <= time.date() < ramadhan_end.date():
-                if self._praytime_message is not None and (time.date() - timedelta(days=1)).day == (self._praytime_message.created_at + timedelta(hours=7)).day:
+                self._praytime_message = await self._praytime_channel.fetch_message(self._praytime_channel.last_message_id)
+
+                if self._praytime_message.created_at.day != time.day:
                     self._praytime_message = None
 
                 self._is_ramadhan = True
@@ -84,7 +86,7 @@ class ModularBotTask:
                 self._is_ramadhan = False
                 self._praytime_message = None
 
-            if overwrites.view_channel is not self._is_ramadhan:
+            if not overwrites.view_channel is self._is_ramadhan:
                 await channel.set_permissions(role, view_channel=True)
 
     @staticmethod
@@ -113,8 +115,8 @@ class ModularBotTask:
                 is_praytime: Embed | None = Prayers.prayers_generator(
                     praytimes=self._praytimes, time=time)
 
-                if is_praytime is not None:
-                    if self._praytime_message is not None:
+                if not is_praytime is None:
+                    if not self._praytime_message is None:
                         await self._praytime_message.delete()
 
                     self._praytime_message = await self._praytime_channel.send(embed=is_praytime)
@@ -256,7 +258,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         await self._analytics()
 
     async def on_member_join(self, member: Member) -> None:
-        if member.guild.id is not self._guild.id:
+        if not member.guild.id is self._guild.id:
             return
 
         welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.avatar.url)
@@ -344,10 +346,10 @@ async def _help(interaction: Interaction) -> None:
 @guild_only()
 async def _ping(interaction: Interaction) -> None:
     where: str = await ModularUtil.get_geolocation(bot.session)
-    message: str = "Something wnet wrong on our side."
+    message: str = "Something went wrong on our side."
 
-    if where is not None:
-        message = f":cloud: Ping {round(bot.latency * 1000)}ms, server location {where} :earth_americas:"
+    if not where is None:
+        message = f":cloud: Ping {round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
 
     await ModularUtil.send_response(interaction, message=message, ephemeral=True)
 
