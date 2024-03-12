@@ -1,9 +1,10 @@
 from asyncio import sleep, wait, create_task
 from io import BytesIO
-from re import search, IGNORECASE
 from random import choice
-
 from datetime import timedelta, datetime
+
+from pytz import timezone
+
 from discord.ext import commands, tasks
 from discord import (
     Intents,
@@ -77,7 +78,7 @@ class ModularBotTask:
             if ramadhan_start.date() <= time.date() < ramadhan_end.date():
                 self._praytime_message = await self._praytime_channel.fetch_message(self._praytime_channel.last_message_id)
 
-                if self._praytime_message.created_at.day != time.day:
+                if time.date() > self._praytime_message.created_at.astimezone(timezone(ModularBotConst.TIMEZONE)).date():
                     self._praytime_message = None
 
                 self._is_ramadhan = True
