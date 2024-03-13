@@ -37,6 +37,7 @@ class Prayers:
                 if resp.status == 200:
                     temp: dict = await resp.json()
 
+                    temp = temp.get('data')
                     time: datetime = ModularUtil.get_time()
                     cur_date: str = f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"
                     res.update(
