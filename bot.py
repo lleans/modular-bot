@@ -99,7 +99,7 @@ class ModularBotTask:
 
         await Pool.connect(nodes=nodes, client=bot, cache_capacity=20)
 
-    @tasks.loop(hours=3)
+    @tasks.loop(hours=1)
     async def _pull_data(self) -> None:
         try:
             self._praytimes = await Prayers.get_prayertime(session=self.session)
@@ -116,8 +116,8 @@ class ModularBotTask:
                 is_praytime: Embed | None = Prayers.prayers_generator(
                     praytimes=self._praytimes, time=time)
 
-                if not is_praytime is None:
-                    if not self._praytime_message is None:
+                if is_praytime is not None:
+                    if self._praytime_message is not None:
                         await self._praytime_message.delete()
 
                     self._praytime_message = await self._praytime_channel.send(embed=is_praytime)
@@ -349,7 +349,7 @@ async def _ping(interaction: Interaction) -> None:
     where: str = await ModularUtil.get_geolocation(bot.session)
     message: str = "Something went wrong on our side."
 
-    if not where is None:
+    if where:
         message = f":cloud: Ping {round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
 
     await ModularUtil.send_response(interaction, message=message, ephemeral=True)

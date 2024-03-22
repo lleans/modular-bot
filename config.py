@@ -16,8 +16,8 @@ class ModularBotConst:
     class Image:
         RANDOM: list[str] = ["https://i.imgur.com/ImFzDtd.gif", "https://i.imgur.com/vSIWwxP.gif",
                              "https://i.imgur.com/tXnd4IZ.gif", "https://i.imgur.com/IverxEm.gif"]
-        WELCOME_BANNER: str = "https://cdn.discordapp.com/attachments/709580371146047498/802553530460143636/Apq6gwr.png"
-        LEAVE_BANNER: str = "https://cdn.discordapp.com/attachments/709580371146047498/802553806557544488/NlWRR4o.png"
+        # WELCOME_BANNER: str = "https://cdn.discordapp.com/attachments/709580371146047498/802553530460143636/Apq6gwr.png"
+        # LEAVE_BANNER: str = "https://cdn.discordapp.com/attachments/709580371146047498/802553806557544488/NlWRR4o.png"
 
     class LockDownTime:
         START: str = "Friday-09"

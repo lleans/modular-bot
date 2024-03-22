@@ -45,7 +45,7 @@ class ModularUtil:
         return text
 
     @classmethod
-    async def get_geolocation(cls, session: ClientSession) -> str:
+    async def get_geolocation(cls, session: ClientSession) -> str | None:
         async with session.get(cls.__IP_GEOLOCATION_URL) as resp:
             if resp.status == 200:
                 temp: dict = await resp.json()
@@ -109,12 +109,12 @@ class ModularUtil:
         if is_welcome:
             title: str = "Welcome".upper()
             mssg: str = GuildMessage.Banner.WELCOME.upper()
-            banner: str = ModularBotConst.Image.WELCOME_BANNER
+            banner: str = Image.open(path.join(cls.__ASSETS_DIR, 'welcome.png'))
 
         else:
             title = "Goodbye".upper()
             mssg = GuildMessage.Banner.LEAVE.upper()
-            banner: str = ModularBotConst.Image.LEAVE_BANNER
+            banner: str = Image.open(path.join(cls.__ASSETS_DIR, 'leaving.jpg'))
 
         profile_size: int = 2.2
 
