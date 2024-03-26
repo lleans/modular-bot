@@ -20,14 +20,14 @@ class Prayers:
                       "https://i.imgur.com/zCSohsn.gif", "https://i.imgur.com/OGesUM4.gif",
                       "https://i.imgur.com/VTPufTo.gif"]
 
-    __QUOTES = ["`Salah satu dosa terburuk adalah seseorang yang menganggap remeh dosanya. \n\n- Abu Bakar Asshidiq`",
-                "`Tidak boleh seorang muslim menghina muslim yang lain. Yang kecil pada kaum muslimin, adalah besar pada sisi Allah. \n\n- Abu Bakar Asshidiq`",
-                "`Buatlah tujuan untuk hidup, kemudian gunakan segenap kekuatan untuk mencapainya, kamu pasti berhasil. \n\n- Ustman Bin Affan`",
-                "`Jangan pernah membuat keputusan dalam kemarahan dan jangan pernah membuat janji dalam kebahagiaan. \n\n- Ali Bin Abi Thalib`",
-                "`Memang sulit untuk bersabar, tapi menyia-nyiakan pahala dari sebuah kesabaran itu jauh lebih buruk. \n\n- Abu Bakar Ash-Shiddiq`",
-                "`Terkadang, orang dengan masa lalu paling kelam akan menciptakan masa depan yang paling cerah. \n\n- Umar bin Khattab`",
-                "`Jangan bersedih atas apa yang telah berlalu, kecuali kalau itu bisa membuatmu bekerja lebih keras untuk apa yang akan datang. \n\n- Umar bin Khattab`",
-                "`Biasakan diri dengan hidup susah, karena kesenangan tidak akan kekal selamanya. \n\n- Umar bin Khattab`"]
+    __QUOTES = ["Salah satu dosa terburuk adalah seseorang yang menganggap remeh dosanya. \n\n- Abu Bakar Asshidiq",
+                "Tidak boleh seorang muslim menghina muslim yang lain. Yang kecil pada kaum muslimin, adalah besar pada sisi Allah. \n\n- Abu Bakar Asshidiq",
+                "Buatlah tujuan untuk hidup, kemudian gunakan segenap kekuatan untuk mencapainya, kamu pasti berhasil. \n\n- Ustman Bin Affan",
+                "Jangan pernah membuat keputusan dalam kemarahan dan jangan pernah membuat janji dalam kebahagiaan. \n\n- Ali Bin Abi Thalib",
+                "Memang sulit untuk bersabar, tapi menyia-nyiakan pahala dari sebuah kesabaran itu jauh lebih buruk. \n\n- Abu Bakar Ash-Shiddiq",
+                "Terkadang, orang dengan masa lalu paling kelam akan menciptakan masa depan yang paling cerah. \n\n- Umar bin Khattab",
+                "Jangan bersedih atas apa yang telah berlalu, kecuali kalau itu bisa membuatmu bekerja lebih keras untuk apa yang akan datang. \n\n- Umar bin Khattab",
+                "Biasakan diri dengan hidup susah, karena kesenangan tidak akan kekal selamanya. \n\n- Umar bin Khattab"]
 
     @classmethod
     async def get_prayertime(cls, session: ClientSession) -> dict | None:
@@ -62,7 +62,7 @@ class Prayers:
             choice(ModularBotConst.Color.RANDOM)), title=None)
         e.set_author(name="Muslim Pro",
                      icon_url="https://i.imgur.com/T7Zqnzw.png")
-        e.description = f"**Quote hari ini**\n{choice(cls.__QUOTES)}\n\n**Jadwal salat hari ini:**"
+        e.description = f"**Quote hari ini**\n```{choice(cls.__QUOTES)}```\n\n**Jadwal salat hari ini:**"
 
         for pray, prayt in praytimes.items():
 
