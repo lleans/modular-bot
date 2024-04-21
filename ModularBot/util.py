@@ -119,8 +119,7 @@ class ModularUtil:
         profile_size: int = 2.2
 
         profile: Image = await load_image_async(avatar)
-        backgr: Image = await load_image_async(banner)
-        background: Editor = Editor(backgr)
+        background: Editor = Editor(banner)
 
         profile_size: int = int(background.image.size[1]//profile_size)
         wI, hI = background.image.size
