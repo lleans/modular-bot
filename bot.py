@@ -87,8 +87,11 @@ class ModularBotTask:
                 self._is_ramadhan = False
                 self._praytime_message = None
 
-            if not overwrites.view_channel is self._is_ramadhan:
+            if self._is_ramadhan and overwrites.view_channel is not True:
                 await channel.set_permissions(role, view_channel=True)
+
+            elif not self._is_ramadhan and overwrites.view_channel is not False:
+                await channel.set_permissions(role, view_channel=False)
 
     @staticmethod
     async def _connect_nodes_lavalink(bot: commands.Bot) -> None:
