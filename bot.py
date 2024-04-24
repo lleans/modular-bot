@@ -265,7 +265,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         if not member.guild.id is self._guild.id:
             return
 
-        welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.avatar.url)
+        welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.display_avatar.url)
 
         welcome_channel: TextChannel = self.get_channel(
             GuildChannel.WELCOME_CHANNEL)
@@ -282,7 +282,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
             return
 
     async def on_member_remove(self, member: Member) -> None:
-        leave_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.avatar.url, is_welcome=False)
+        leave_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.display_avatar.url, is_welcome=False)
 
         leave_channel: TextChannel = self.get_channel(
             GuildChannel.GOODBYE_CHANNEL)
