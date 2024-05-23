@@ -66,7 +66,7 @@ class Administrator(commands.Cog):
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
             ModularBotConst.Color.SUCCESS))
         embed.set_footer(
-            text=f"From {interaction.user.name}", icon_url=interaction.user.display_avatar)
+            text=f"From {interaction.user.display_name}", icon_url=interaction.user.display_avatar)
         guild: Guild = self._bot._guild
         role: Role = guild.get_role(GuildRole.MAGICIAN)
         is_exist: Role = user.get_role(GuildRole.MAGICIAN)
@@ -89,7 +89,7 @@ class Administrator(commands.Cog):
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
             ModularBotConst.Color.SUCCESS))
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f'From {interaction.user.display_name} ', icon_url=interaction.user.display_avatar)
         guild: Guild = self._bot._guild
         role: Role = guild.get_role(GuildRole.THE_MUSKETEER)
         is_exist: Role = user.get_role(GuildRole.THE_MUSKETEER)
@@ -112,7 +112,7 @@ class Administrator(commands.Cog):
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
             ModularBotConst.Color.SUCCESS))
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f'From {interaction.user.display_name} ', icon_url=interaction.user.display_avatar)
         is_exist: Role = user.get_role(GuildRole.MAGICIAN)
 
         if is_exist:
@@ -132,7 +132,7 @@ class Administrator(commands.Cog):
         embed: Embed = Embed(timestamp=ModularUtil.get_time(), color=ModularUtil.convert_color(
             ModularBotConst.Color.SUCCESS))
         embed.set_footer(
-            text=f'From {interaction.user.name} ', icon_url=interaction.user.display_avatar)
+            text=f'From {interaction.user.display_name} ', icon_url=interaction.user.display_avatar)
         is_exist: Role = user.get_role(GuildRole.THE_MUSKETEER)
 
         if is_exist:

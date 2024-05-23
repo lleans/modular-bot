@@ -197,7 +197,7 @@ class ModularBotBase(commands.Bot):
             else:
                 embed.add_field(name=f"**{command.name}**",
                                 value="Access it through Apps Command", inline=True)
-        embed.set_author(name=self.user.name,
+        embed.set_author(name=self.user.display_name,
                          icon_url=self.user.display_avatar)
         embed.set_footer(
             text=f" © {ModularBotConst.BOT_NAME} • If there is something wrong contact Admin")
@@ -265,7 +265,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         if not member.guild.id is self._guild.id:
             return
 
-        welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.display_avatar.url)
+        welcome_banner: BytesIO = await ModularUtil.banner_creator(str(member.display_name), member.display_avatar.url)
 
         welcome_channel: TextChannel = self.get_channel(
             GuildChannel.WELCOME_CHANNEL)
@@ -282,7 +282,7 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
             return
 
     async def on_member_remove(self, member: Member) -> None:
-        leave_banner: BytesIO = await ModularUtil.banner_creator(str(member.name), member.display_avatar.url, is_welcome=False)
+        leave_banner: BytesIO = await ModularUtil.banner_creator(str(member.display_name), member.display_avatar.url, is_welcome=False)
 
         leave_channel: TextChannel = self.get_channel(
             GuildChannel.GOODBYE_CHANNEL)

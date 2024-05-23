@@ -462,6 +462,13 @@ class Multimedia(commands.Cog, TrackPlayer):
 
     async def cog_app_command_error(self, interaction: Interaction, error: AppCommandError) -> None:
         if not isinstance(error, CheckFailure):
-            await ModularUtil.send_response(interaction, message=f"Unknown error, {Exception(error)}", emoji="❓")
+            embed: Embed = Embed(
+                title="⁉️ Unknown error",
+                description=f'```arm\n{Exception(error)}\n```',
+                color=ModularUtil.convert_color(
+                    ModularBotConst.Color.FAILED),
+                timestamp=ModularUtil.get_time()
+            )
+            await ModularUtil.send_response(interaction, embed=embed)
 
         return await super().cog_app_command_error(interaction, error)
