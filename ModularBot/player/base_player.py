@@ -193,18 +193,18 @@ class TrackPlayerBase:
 
         return embed
 
-    # async def _lyrics_finder(self, interaction: Interaction) -> tuple[Embed, View]:
-    #     player: CustomPlayer = cast(
-    #         CustomPlayer, interaction.guild.voice_client)
+    async def _lyrics_finder(self, interaction: Interaction) -> tuple[Embed, View]:
+        player: CustomPlayer = cast(
+            CustomPlayer, interaction.guild.voice_client)
 
-    #     embed: Embed = Embed(color=ModularUtil.convert_color(
-    #         ModularBotConst.Color.FAILED))
+        embed: Embed = Embed(color=ModularUtil.convert_color(
+            ModularBotConst.Color.FAILED))
 
-    #     view: View = SelectViewSubtitle(
-    #         self.__lf_client, player._original, interaction)
-    #     embed: Embed = await view.create_embed()
+        view: View = SelectViewSubtitle(
+            self.__lf_client, player._original, interaction)
+        embed: Embed = await view.create_embed()
 
-    #     return (embed, view)
+        return (embed, view)
 
     async def _update_player(self, interaction: Interaction) -> None:
         player: CustomPlayer = cast(
