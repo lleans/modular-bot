@@ -11,7 +11,7 @@ easy-pil==0.3.3
 frozenlist==1.4.1
 idna==3.6
 iso639-lang==2.2.3
-LyricsFindScrapper @ git+https://github.com/lleans/lyricfind-scrapper.git@cd14198dce53f3d2d589e4aa5f50feac5c7936c6
+#LyricsFindScrapper @ git+https://github.com/lleans/lyricfind-scrapper.git@cd14198dce53f3d2d589e4aa5f50feac5c7936c6
 multidict==6.0.5
 Pillow==10.1.0
 pycparser==2.22
