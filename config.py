@@ -73,7 +73,7 @@ class GuildMessage:
         f"degan begitu kamu setuju dengan rules kami, dan akan mendapat akses server **{ModularBotConst.SERVER_NAME}**\n\n" \
         "**Kalau mau invite temen pakai link mana ?**\n" \
         f"kalau mau ajak temen pakai link di <#{GuildChannel.INVITE_CHANNEL}>\n\n" \
-        f"*Semoga betah ya di sini \ ya* :blush:\n\n\nSalam **{ModularBotConst.BOT_NAME}**"
+        f"*Semoga betah ya di sini ya* :blush:\n\n\nSalam **{ModularBotConst.BOT_NAME}**"
     LOCKDOWN_FEATURE: str = "Hanya Mengingatkan..."
 
 
