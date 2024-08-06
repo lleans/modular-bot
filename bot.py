@@ -98,9 +98,27 @@ class ModularBotTask:
         await bot.wait_until_ready()
         inactive_timeout: int = timedelta(minutes=30).total_seconds()
 
-        nodes: list[Node] = [Node(uri=ModularBotConst.LAVALINK_SERVER, password=ModularBotConst.LAVALINK_PASSWORD, inactive_player_timeout=inactive_timeout)]
+        def get_lavalink_nodes() -> list[Node]:
+            temp: list[Node] = list()
 
-        await Pool.connect(nodes=nodes, client=bot, cache_capacity=20)
+            server: list[str] = ModularBotConst.LAVALINK_SERVER.split(',')
+            server_pass: list[str] = ModularBotConst.LAVALINK_PASSWORD.split(
+                ',')
+
+            if len(server) != len(server_pass):
+                ModularUtil.simple_log(
+                    "Host and Password length must match. Please check your config, make sure it divided by ','. Fallback into using one node")
+                temp.append(Node(uri=server[0], password=server_pass[0],
+                            inactive_player_timeout=inactive_timeout, retries=3))
+                return temp
+
+            for s, p in zip(server, server_pass):
+                temp.append(
+                    Node(uri=s, password=p, inactive_player_timeout=inactive_timeout, retries=3))
+
+            return temp
+
+        await Pool.connect(nodes=get_lavalink_nodes(), client=bot, cache_capacity=20)
 
     @tasks.loop(hours=1)
     async def _pull_data(self) -> None:
@@ -185,7 +203,8 @@ class ModularBotBase(commands.Bot):
     _guild: Guild
 
     async def _help_embed(self) -> Embed:
-        desc: str = f"Here's a few feature that's available on {ModularBotConst.SERVER_NAME}."
+        desc: str = f"Here's a few feature that's available on {
+            ModularBotConst.SERVER_NAME}."
         embed: Embed = Embed(title=f"Menu {ModularBotConst.SERVER_NAME}",
                              description=desc, color=ModularUtil.convert_color(choice(ModularBotConst.Color.RANDOM)))
 
@@ -353,7 +372,8 @@ async def _ping(interaction: Interaction) -> None:
     message: str = "Something went wrong on our side."
 
     if where:
-        message = f":cloud: Ping {round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
+        message = f":cloud: Ping {
+            round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
 
     await ModularUtil.send_response(interaction, message=message, ephemeral=True)
 
