@@ -27,10 +27,10 @@ from wavelink import (
     TrackExceptionEventPayload
 )
 
-from LyricsFindScrapper import Search as SearchLF
+# from LyricsFindScrapper import Search as SearchLF
 
 from .interfaces import TrackType, CustomYouTubeMusicPlayable, CustomPlayer
-from .view import TrackView, SelectViewSubtitle
+from .view import TrackView
 from ..util import ModularUtil
 from .util_player import UtilTrackPlayer
 from config import ModularBotConst
@@ -121,7 +121,8 @@ class TrackPlayerBase:
     _bot: commands.Bot
 
     def __init__(self) -> None:
-        self.__lf_client = SearchLF(session=self._bot.session)
+        # self.__lf_client = SearchLF(session=self._bot.session)
+        pass
 
     async def _custom_wavelink_searcher(self, query: str, track_type: TrackType, is_search: bool = False) -> Playable | Playlist:
         """Will return either List of tracks or Single Tracks"""
@@ -193,18 +194,18 @@ class TrackPlayerBase:
 
         return embed
 
-    async def _lyrics_finder(self, interaction: Interaction) -> tuple[Embed, View]:
-        player: CustomPlayer = cast(
-            CustomPlayer, interaction.guild.voice_client)
+    # async def _lyrics_finder(self, interaction: Interaction) -> tuple[Embed, View]:
+    #     player: CustomPlayer = cast(
+    #         CustomPlayer, interaction.guild.voice_client)
 
-        embed: Embed = Embed(color=ModularUtil.convert_color(
-            ModularBotConst.Color.FAILED))
+    #     embed: Embed = Embed(color=ModularUtil.convert_color(
+    #         ModularBotConst.Color.FAILED))
 
-        view: View = SelectViewSubtitle(
-            self.__lf_client, player._original, interaction)
-        embed: Embed = await view.create_embed()
+    #     view: View = SelectViewSubtitle(
+    #         self.__lf_client, player._original, interaction)
+    #     embed: Embed = await view.create_embed()
 
-        return (embed, view)
+    #     return (embed, view)
 
     async def _update_player(self, interaction: Interaction) -> None:
         player: CustomPlayer = cast(

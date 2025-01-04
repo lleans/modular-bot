@@ -316,19 +316,29 @@ class Multimedia(commands.Cog, TrackPlayer):
 
         await ModularUtil.send_response(interaction, embed=embed)
 
-    @command(name="lyrics", description="Get lyrics of the tracks(fetched from LyricFind)")
+    # @command(name="lyrics", description="Get lyrics of the tracks(fetched from LyricFind)")
+    @command(name="lyrics", description="Currently disabled")
     @TrackPlayerDecorator.is_client_exist()
     @TrackPlayerDecorator.is_user_allowed()
     @TrackPlayerDecorator.is_playing()
     async def _lyrics(self, interaction: Interaction) -> None:
+        # await interaction.response.defer(ephemeral=True)
+        # view: View = None
+        # embed: Embed = Embed(color=ModularUtil.convert_color(
+        #     ModularBotConst.Color.FAILED))
+
+        # embed, view = await self._lyrics_finder(interaction=interaction)
+
+        # await ModularUtil.send_response(interaction, embed=embed, view=view)
         await interaction.response.defer(ephemeral=True)
-        view: View = None
         embed: Embed = Embed(color=ModularUtil.convert_color(
             ModularBotConst.Color.FAILED))
 
-        embed, view = await self._lyrics_finder(interaction=interaction)
+        embed.description = "Currently disabled"
+        # embed, view = await self._lyrics_finder(interaction=interaction)
 
-        await ModularUtil.send_response(interaction, embed=embed, view=view)
+        await ModularUtil.send_response(interaction, embed=embed)
+        pass
 
     @command(name="loop", description="Loop current Track/Playlist")
     @describe(is_queue="Loop current player queue, instead current track(if player queue empty, loop through history)")

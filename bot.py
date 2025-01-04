@@ -216,6 +216,7 @@ class ModularBotBase(commands.Bot):
             else:
                 embed.add_field(name=f"**{command.name}**",
                                 value="Access it through Apps Command", inline=True)
+        embed._fields = embed._fields[:25]
         embed.set_author(name=self.user.display_name,
                          icon_url=self.user.display_avatar)
         embed.set_footer(
@@ -356,25 +357,28 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
         ])
 
 
-bot: commands.Bot = ModularBotClient()
+def main() -> None:
+    bot: commands.Bot = ModularBotClient()
+
+    @bot.tree.command(name='help', description='Help user to find command')
+    @guild_only()
+    async def _help(interaction: Interaction) -> None:
+        await ModularUtil.send_response(interaction, embed=await bot._help_embed(), ephemeral=True)
+
+    @bot.tree.command(name='ping', description='Ping how much latency with user')
+    @guild_only()
+    async def _ping(interaction: Interaction) -> None:
+        where: str = await ModularUtil.get_geolocation(bot.session)
+        message: str = "Something went wrong on our side."
+
+        if where:
+            message = f":cloud: Ping {
+                round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
+
+        await ModularUtil.send_response(interaction, message=message, ephemeral=True)
+
+    bot.run(token=ModularBotConst.TOKEN.strip())
 
 
-@bot.tree.command(name='help', description='Help user to find command')
-@guild_only()
-async def _help(interaction: Interaction) -> None:
-    await ModularUtil.send_response(interaction, embed=await bot._help_embed(), ephemeral=True)
-
-
-@bot.tree.command(name='ping', description='Ping how much latency with user')
-@guild_only()
-async def _ping(interaction: Interaction) -> None:
-    where: str = await ModularUtil.get_geolocation(bot.session)
-    message: str = "Something went wrong on our side."
-
-    if where:
-        message = f":cloud: Ping {
-            round(bot.latency * 1000)}ms, bot server location {where} :earth_americas:"
-
-    await ModularUtil.send_response(interaction, message=message, ephemeral=True)
-
-bot.run(token=ModularBotConst.TOKEN.strip())
+if __name__ == '__main__':
+    main()

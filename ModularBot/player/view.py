@@ -25,7 +25,7 @@ from wavelink import (
 
 from iso639 import Lang
 
-from LyricsFindScrapper import Search as SearchLF, Track, SongData, Translation, LFException
+# from LyricsFindScrapper import Search as SearchLF, Track, SongData, Translation, LFException
 
 from .interfaces import (
     CustomPlayer,
@@ -198,128 +198,128 @@ class TrackView(View):
         self.__track_control.loop(interaction)
         await self.__update_message(interaction)
 
+# TODO Need to fix this
+# class SelectViewSubtitle(View):
 
-class SelectViewSubtitle(View):
+#     def __init__(self, lf_client: SearchLF, playable: Playable, interaction: Interaction, /, *, timeout: float | None = 180):
+#         self.__lf_client: SearchLF = lf_client
+#         self.__interaction: Interaction = interaction
+#         self.__playable: Playable = playable
 
-    def __init__(self, lf_client: SearchLF, playable: Playable, interaction: Interaction, /, *, timeout: float | None = 180):
-        self.__lf_client: SearchLF = lf_client
-        self.__interaction: Interaction = interaction
-        self.__playable: Playable = playable
+#         timeout = playable.length
 
-        timeout = playable.length
+#         self.__target_lang: str = None
+#         self.__available_lang: list[str] = []
 
-        self.__target_lang: str = None
-        self.__available_lang: list[str] = []
+#         self.__track: Track = None
+#         self.__lyrics: str = None
 
-        self.__track: Track = None
-        self.__lyrics: str = None
+#         self.__rand_emoji: list[str] = ['🈴', '🅰', '🈵', '🈹', '🈲']
 
-        self.__rand_emoji: list[str] = ['🈴', '🅰', '🈵', '🈹', '🈲']
+#         super().__init__(timeout=timeout)
 
-        super().__init__(timeout=timeout)
+#     async def create_embed(self) -> Embed:
+#         embed: Embed = Embed(color=ModularUtil.convert_color(
+#             ModularBotConst.Color.FAILED))
+#         embed.title = f"🎼 Lyrics of - {
+#             self.__playable.title} | {self.__playable.author}"
+#         embed.set_author(
+#             name="LyricFind",
+#             icon_url="https://www.google.com/s2/favicons?domain={domain}&sz=256".format(
+#                 domain='lyricfind.com')
+#         )
+#         song_data: SongData = None
 
-    async def create_embed(self) -> Embed:
-        embed: Embed = Embed(color=ModularUtil.convert_color(
-            ModularBotConst.Color.FAILED))
-        embed.title = f"🎼 Lyrics of - {
-            self.__playable.title} | {self.__playable.author}"
-        embed.set_author(
-            name="LyricFind",
-            icon_url="https://www.google.com/s2/favicons?domain={domain}&sz=256".format(
-                domain='lyricfind.com')
-        )
-        song_data: SongData = None
+#         try:
+#             if not self.__track:
+#                 self.__track = await self.__lf_client.get_track(trackid=f'isrc:{self.__playable.isrc}')
 
-        try:
-            if not self.__track:
-                self.__track = await self.__lf_client.get_track(trackid=f'isrc:{self.__playable.isrc}')
+#             if not self.__lyrics or (self.__target_lang and self.__target_lang == self.__available_lang[0]):
+#                 song_data: SongData = await self.__lf_client.get_lyrics(track=self.__track)
 
-            if not self.__lyrics or (self.__target_lang and self.__target_lang == self.__available_lang[0]):
-                song_data: SongData = await self.__lf_client.get_lyrics(track=self.__track)
+#                 if not self.__available_lang:
+#                     self.__available_lang.append(song_data.language)
+#                     if song_data.available_translations:
+#                         self.__available_lang.extend(
+#                             song_data.available_translations)
 
-                if not self.__available_lang:
-                    self.__available_lang.append(song_data.language)
-                    if song_data.available_translations:
-                        self.__available_lang.extend(
-                            song_data.available_translations)
+#                     self.__available_lang = [
+#                         [x, choice(self.__rand_emoji)] for x in self.__available_lang]
 
-                    self.__available_lang = [
-                        [x, choice(self.__rand_emoji)] for x in self.__available_lang]
+#                 self.__lyrics = song_data.lyrics
+#         except (LFException, Exception) as e:
+#             if e.http_code == 202:
+#                 embed.description = f'```arm\nTrack was not found in LyricFind!!\n```'
+#             else:
+#                 embed.description = f'```arm\n{e}\n```'
 
-                self.__lyrics = song_data.lyrics
-        except (LFException, Exception) as e:
-            if e.http_code == 202:
-                embed.description = f'```arm\nTrack was not found in LyricFind!!\n```'
-            else:
-                embed.description = f'```arm\n{e}\n```'
+#             self.clear_items()
+#             return embed
 
-            self.clear_items()
-            return embed
+#         self.__pass_data_to_option()
+#         embed.title = f"🎼 Lyrics of {
+#             self.__track.title} - {self.__track.artist}"
 
-        self.__pass_data_to_option()
-        embed.title = f"🎼 Lyrics of {
-            self.__track.title} - {self.__track.artist}"
+#         max_lyric: int = 4096
+#         embed.description = self.__lyrics[:max_lyric - 256] + \
+#             f"[...](https://lyrics.lyricfind.com/lyrics/{self.__track.slug})" if len(
+#                 self.__lyrics) > max_lyric else self.__lyrics + f"\n\n[origin](https://lyrics.lyricfind.com/lyrics/{self.__track.slug})"
 
-        max_lyric: int = 4096
-        embed.description = self.__lyrics[:max_lyric - 256] + \
-            f"[...](https://lyrics.lyricfind.com/lyrics/{self.__track.slug})" if len(
-                self.__lyrics) > max_lyric else self.__lyrics + f"\n\n[origin](https://lyrics.lyricfind.com/lyrics/{self.__track.slug})"
+#         embed.color = ModularUtil.convert_color(ModularBotConst.Color.NEUTRAL)
 
-        embed.color = ModularUtil.convert_color(ModularBotConst.Color.NEUTRAL)
+#         return embed
 
-        return embed
+#     def __pass_data_to_option(self) -> None:
+#         if len(self.__available_lang) == 1:
+#             self.clear_items()
+#         else:
+#             self._selector.options.clear()
 
-    def __pass_data_to_option(self) -> None:
-        if len(self.__available_lang) == 1:
-            self.clear_items()
-        else:
-            self._selector.options.clear()
+#         index_target: int = 0
 
-        index_target: int = 0
+#         if self.__target_lang:
+#             index_target = self.__available_lang.index(self.__target_lang)
 
-        if self.__target_lang:
-            index_target = self.__available_lang.index(self.__target_lang)
+#         for index, lang in enumerate(self.__available_lang):
+#             desc: str = None
+#             if index == 0:
+#                 desc = "Default language"
+#             elif index == index_target:
+#                 desc = "Current language"
 
-        for index, lang in enumerate(self.__available_lang):
-            desc: str = None
-            if index == 0:
-                desc = "Default language"
-            elif index == index_target:
-                desc = "Current language"
+#             self._selector.append_option(SelectOption(
+#                 label=Lang(lang[0]).name.capitalize(),
+#                 emoji=lang[1],
+#                 description=desc,
+#                 value=str(index)
+#             ))
 
-            self._selector.append_option(SelectOption(
-                label=Lang(lang[0]).name.capitalize(),
-                emoji=lang[1],
-                description=desc,
-                value=str(index)
-            ))
+#         self._selector.options[index_target].default = True
 
-        self._selector.options[index_target].default = True
+#     def __update_state_selected(self) -> None:
+#         self._selector.placeholder = f"{self._selector.options[int(self._selector.values[0])].emoji} \
+#               {self._selector.options[int(self._selector.values[0])].label}"
 
-    def __update_state_selected(self) -> None:
-        self._selector.placeholder = f"{self._selector.options[int(self._selector.values[0])].emoji} \
-              {self._selector.options[int(self._selector.values[0])].label}"
+#     async def __update_message(self, interaction: Interaction):
+#         embed: Embed = await self.create_embed()
+#         embed.timestamp = interaction.created_at
+#         await interaction.edit_original_response(view=self, embed=embed)
 
-    async def __update_message(self, interaction: Interaction):
-        embed: Embed = await self.create_embed()
-        embed.timestamp = interaction.created_at
-        await interaction.edit_original_response(view=self, embed=embed)
+#     async def on_timeout(self) -> None:
+#         await self.__interaction.delete_original_response()
+#         return await super().on_timeout()
 
-    async def on_timeout(self) -> None:
-        await self.__interaction.delete_original_response()
-        return await super().on_timeout()
+#     @select(placeholder="🈴 Available Translations!")
+#     async def _selector(self, interaction: Interaction, select: Select) -> None:
+#         await interaction.response.defer()
+#         self.__target_lang = self.__available_lang[int(select.values[0])]
 
-    @select(placeholder="🈴 Available Translations!")
-    async def _selector(self, interaction: Interaction, select: Select) -> None:
-        await interaction.response.defer()
-        self.__target_lang = self.__available_lang[int(select.values[0])]
+#         if self.__target_lang != self.__available_lang[0]:
+#             tl: Translation = await self.__lf_client.get_translation(self.__track, self.__target_lang[0])
+#             self.__lyrics = tl.translation
 
-        if self.__target_lang != self.__available_lang[0]:
-            tl: Translation = await self.__lf_client.get_translation(self.__track, self.__target_lang[0])
-            self.__lyrics = tl.translation
-
-        self.__update_state_selected()
-        await self.__update_message(interaction=interaction)
+#         self.__update_state_selected()
+#         await self.__update_message(interaction=interaction)
 
 
 class SelectViewTrack(View):
