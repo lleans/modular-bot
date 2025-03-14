@@ -19,24 +19,26 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-editable --compile-bytecode
+    uv pip install --system --compile-bytecode -r pyproject.toml 
 
 # Copy the project into the intermediate image
 ADD . /app
 
-# Sync the project
+# Install the application
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-editable
+    uv pip install --system -e .
 
 # Stage 2: Runtime stage
 FROM python:3.12-alpine
-
 WORKDIR /app
 
-# Copy the application from the builder
-COPY --from=builder --chown=app:app /app .
+# Copy the application and deps from the builder
+COPY --from=builder --chown=app:app /usr/local /usr/local
+COPY --from=builder --chown=app:app /app/ .
 
-# Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
+# Create a non-root user and group for security
+RUN addgroup -S app && adduser -S -G app app
+RUN chown -R app:app /app
+USER app
 
-CMD ["python", "bot.py"]
+ENTRYPOINT [ "python3", "bot.py" ]
