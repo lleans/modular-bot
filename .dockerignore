@@ -1,0 +1,10 @@
+__pycache__
+.venv
+.vscode
+TOKEN
+.gitignore
+.env
+Lavalink
+.github
+README.md
+.ruff_cache*

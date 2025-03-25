@@ -1,0 +1,6 @@
+__pycache__
+TOKEN
+.env
+.venv*
+Lavalink*
+.ruff_cache*

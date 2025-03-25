@@ -3,200 +3,208 @@ from itertools import chain
 from random import choice
 
 from discord import (
-    Interaction,
-    Embed,
-    ButtonStyle,
-    SelectOption,
+	Interaction,
+	Embed,
+	ButtonStyle,
+	SelectOption,
 )
-from discord.ui import (
-    View,
-    Select,
-    button,
-    select
-)
+from discord.ui import View, Select, button, select
 from discord.errors import NotFound
 
-from wavelink import (
-    QueueEmpty,
-    Queue,
-    Playable,
-    QueueMode
-)
+from wavelink import QueueEmpty, Queue, Playable, QueueMode
 
-from iso639 import Lang
 
 # from LyricsFindScrapper import Search as SearchLF, Track, SongData, Translation, LFException
 
-from .interfaces import (
-    CustomPlayer,
-    TrackPlayerInterface,
-    TrackType
-)
+from .interfaces import CustomPlayer, TrackPlayerInterface, TrackType
 from ..util import ModularUtil
 from .util_player import UtilTrackPlayer
 from config import ModularBotConst
 
 
 class TrackView(View):
+	def __init__(
+		self,
+		control: TrackPlayerInterface,
+		player: CustomPlayer,
+		/,
+		*,
+		timeout: float | None = None,
+	):
+		self.__track_control: TrackPlayerInterface = control
+		self.__player: CustomPlayer = player
+		self.__is_playing: bool = not self.__player.paused
+		self.__is_loop: bool = (
+			True if self.__player.queue.mode is QueueMode.loop else False
+		)
+		self.__is_loop_queue: bool = (
+			True if self.__player.queue.mode is QueueMode.loop_all else False
+		)
 
-    def __init__(self, control: TrackPlayerInterface, player: CustomPlayer, /, *, timeout: float | None = None):
-        self.__track_control: TrackPlayerInterface = control
-        self.__player: CustomPlayer = player
-        self.__is_playing: bool = not self.__player.paused
-        self.__is_loop: bool = True if self.__player.queue.mode is QueueMode.loop else False
-        self.__is_loop_queue: bool = True if self.__player.queue.mode is QueueMode.loop_all else False
+		super().__init__(timeout=timeout)
 
-        super().__init__(timeout=timeout)
+	@property
+	def __is_previous_disabled(self) -> bool:
+		if self.__player.queue.history.is_empty or (
+			self.__player.queue.history[-1] is self.__player._original
+			and self.__player.queue.history.count <= 1
+		):
+			return True
 
-    @property
-    def __is_previous_disabled(self) -> bool:
-        if self.__player.queue.history.is_empty or (
-            self.__player.queue.history[-1] is self.__player._original and
-            self.__player.queue.history.count <= 1
-        ):
-            return True
+		return False
 
-        return False
+	@property
+	def get_embed(self) -> Embed:
+		interaction: Interaction = self.__player.interaction
+		track: Playable = self.__player._original
+		self.__update_button()
 
-    @property
-    def get_embed(self) -> Embed:
-        interaction: Interaction = self.__player.interaction
-        track: Playable = self.__player._original
-        self.__update_button()
+		embed = Embed(
+			title="🎶 Now Playing",
+			color=ModularUtil.convert_color(ModularBotConst.Color.WARNING),
+			description=f"**[{track.title} | {track.author}]({track.uri})** - **{
+				UtilTrackPlayer.parse_sec(track.length)
+			}**",
+			timestamp=interaction.created_at,
+		)
 
-        embed = Embed(
-            title="🎶 Now Playing",
-            color=ModularUtil.convert_color(ModularBotConst.Color.WARNING),
-            description=f"**[{track.title} | {track.author}]({track.uri})** - **{
-                UtilTrackPlayer.parse_sec(track.length)}**",
-            timestamp=interaction.created_at
-        )
+		track_type: TrackType = TrackType.what_type(track.uri)
+		embed.set_author(
+			name=str(track_type.name).replace("_", " ").title(),
+			icon_url=track_type.favicon(),
+		)
 
-        track_type: TrackType = TrackType.what_type(track.uri)
-        embed.set_author(name=str(track_type.name).replace(
-            "_", " ").title(), icon_url=track_type.favicon())
+		if self.__is_loop_queue:
+			embed.add_field(name="Loop Queue", value="Active", inline=False)
 
-        if self.__is_loop_queue:
-            embed.add_field(
-                name="Loop Queue",
-                value="Active",
-                inline=False
-            )
+		for key, val in self.__player.current_filter_state().items():
+			if bool(val):
+				embed.add_field(name=f"{str(key).capitalize()} Filter", value=str(val))
 
-        for key, val in self.__player.current_filter_state().items():
-            if bool(val):
-                embed.add_field(
-                    name=f"{str(key).capitalize()} Filter",
-                    value=str(val)
-                )
+		embed.set_thumbnail(
+			url=track.artist.artwork if track.source != "youtube" else None
+		)
+		embed.set_image(url=self.__player.current.artwork)
+		embed.set_footer(
+			text=f"Last control from {interaction.user.display_name}",
+			icon_url=interaction.user.display_avatar,
+		)
 
-        embed.set_thumbnail(
-            url=track.artist.artwork if track.source != "youtube" else None)
-        embed.set_image(url=self.__player.current.artwork)
-        embed.set_footer(
-            text=f'Last control from {interaction.user.display_name}', icon_url=interaction.user.display_avatar)
+		return embed
 
-        return embed
+	async def __update_message(self, interaction: Interaction) -> None:
+		self.__update_button()
 
-    async def __update_message(self, interaction: Interaction) -> None:
-        self.__update_button()
+		try:
+			embed: Embed = self.get_embed
+			await interaction.edit_original_response(view=self, embed=embed)
+		except (NotFound, AttributeError):
+			pass
 
-        try:
-            embed: Embed = self.get_embed
-            await interaction.edit_original_response(view=self, embed=embed)
-        except (NotFound, AttributeError):
-            pass
+	async def interaction_check(self, interaction: Interaction) -> bool:
+		isTrue = True
+		# Check whether user is joined
+		if not interaction.user.voice:
+			await ModularUtil.send_response(
+				interaction,
+				message="Can't do that. \nPlease Join Voice channel first!!",
+				emoji="❌",
+				ephemeral=True,
+			)
+			isTrue = False
 
-    async def interaction_check(self, interaction: Interaction) -> bool:
-        isTrue = True
-        # Check whether user is joined
-        if not interaction.user.voice:
-            await ModularUtil.send_response(interaction, message="Can't do that. \nPlease Join Voice channel first!!", emoji="❌", ephemeral=True)
-            isTrue = False
+		# Check wheter user is allowed
+		elif (
+			interaction.guild.voice_client
+			and interaction.guild.voice_client.channel != interaction.user.voice.channel
+		):
+			await ModularUtil.send_response(
+				interaction,
+				message="Can't do that. \nPlease join the same Voice Channel with bot!!",
+				emoji="🛑",
+				ephemeral=True,
+			)
+			isTrue = False
 
-        # Check wheter user is allowed
-        elif interaction.guild.voice_client and interaction.guild.voice_client.channel != interaction.user.voice.channel:
-            await ModularUtil.send_response(interaction, message="Can't do that. \nPlease join the same Voice Channel with bot!!", emoji="🛑", ephemeral=True)
-            isTrue = False
+		if isTrue:
+			self.__player.interaction = interaction
 
-        if isTrue:
-            self.__player.interaction = interaction
+		return isTrue
 
-        return isTrue
+	def __update_button(self) -> None:
+		self._previous.disabled = self.__is_previous_disabled or self.__is_loop
 
-    def __update_button(self) -> None:
-        self._previous.disabled = self.__is_previous_disabled or self.__is_loop
+		if self.__is_playing:
+			self._pause.label = "Pause"
+			self._pause.emoji = "⏸️"
+			self._pause.style = ButtonStyle.blurple
+		else:
+			self._pause.label = "Resume"
+			self._pause.emoji = "▶️"
+			self._pause.style = ButtonStyle.green
 
-        if self.__is_playing:
-            self._pause.label = "Pause"
-            self._pause.emoji = "⏸️"
-            self._pause.style = ButtonStyle.blurple
-        else:
-            self._pause.label = "Resume"
-            self._pause.emoji = "▶️"
-            self._pause.style = ButtonStyle.green
+		if not self.__is_loop:
+			self._loop.label = "Loop"
+			self._loop.style = ButtonStyle.green
+		else:
+			self._loop.label = "Unloop"
+			self._loop.style = ButtonStyle.red
 
-        if not self.__is_loop:
-            self._loop.label = "Loop"
-            self._loop.style = ButtonStyle.green
-        else:
-            self._loop.label = "Unloop"
-            self._loop.style = ButtonStyle.red
+	@button(label="Previous", emoji="⏮️", style=ButtonStyle.secondary)
+	async def _previous(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(self.__track_control.previous(interaction)),
+		])
 
-    @button(label="Previous", emoji="⏮️", style=ButtonStyle.secondary)
-    async def _previous(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(self.__track_control.previous(interaction))
-        ])
+	@button(label="5s", emoji="◀️", style=ButtonStyle.gray)
+	async def _back(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(self.__track_control.skip(interaction, seconds=-5)),
+		])
 
-    @button(label="5s", emoji="◀️", style=ButtonStyle.gray)
-    async def _back(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(self.__track_control.skip(interaction, seconds=-5))
-        ])
+	@button(label="Pause", emoji="⏸️", style=ButtonStyle.blurple)
+	async def _pause(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
 
-    @button(label="Pause", emoji="⏸️", style=ButtonStyle.blurple)
-    async def _pause(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
+		self.__is_playing = not self.__is_playing
+		if self.__is_playing:
+			await self.__track_control.resume(interaction)
+		else:
+			await self.__track_control.pause(interaction)
 
-        self.__is_playing = not self.__is_playing
-        if self.__is_playing:
-            await self.__track_control.resume(interaction)
-        else:
-            await self.__track_control.pause(interaction)
+		await self.__update_message(interaction)
 
-        await self.__update_message(interaction)
+	@button(label="Stop", emoji="⏹️", style=ButtonStyle.red)
+	async def _stop(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(self.__track_control.stop(interaction)),
+		])
 
-    @button(label="Stop", emoji="⏹️", style=ButtonStyle.red)
-    async def _stop(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(self.__track_control.stop(interaction))
-        ])
+	@button(label="5s", emoji="▶️", style=ButtonStyle.gray)
+	async def _skip(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(self.__track_control.skip(interaction, seconds=5)),
+		])
 
-    @button(label="5s", emoji="▶️", style=ButtonStyle.gray)
-    async def _skip(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(self.__track_control.skip(interaction, seconds=5))
-        ])
+	@button(label="Next", emoji="⏭️", style=ButtonStyle.secondary)
+	async def _next(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(self.__track_control.skip(interaction)),
+		])
 
-    @button(label="Next", emoji="⏭️", style=ButtonStyle.secondary)
-    async def _next(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(self.__track_control.skip(interaction))
-        ])
+	@button(label="Loop", emoji="🔁", style=ButtonStyle.green)
+	async def _loop(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__is_loop = not self.__is_loop
 
-    @button(label="Loop", emoji="🔁", style=ButtonStyle.green)
-    async def _loop(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__is_loop = not self.__is_loop
+		self.__track_control.loop(interaction)
+		await self.__update_message(interaction)
 
-        self.__track_control.loop(interaction)
-        await self.__update_message(interaction)
 
 # TODO Need to fix this
 # class SelectViewSubtitle(View):
@@ -323,287 +331,360 @@ class TrackView(View):
 
 
 class SelectViewTrack(View):
+	SHOW_LIMIT: int = 25
 
-    SHOW_LIMIT: int = 25
+	def __init__(
+		self,
+		control: TrackPlayerInterface,
+		intercation: Interaction,
+		/,
+		data: list[Playable],
+		is_jump_command: bool = False,
+		autoplay: bool = None,
+		force_play: bool = False,
+		put_front: bool = False,
+		*,
+		timeout: float | None = 180,
+	):
+		self.__data: list[Playable] = list(data)
+		self.__track_control: TrackPlayerInterface = control
+		self.__interaction: Interaction = intercation
 
-    def __init__(self, control: TrackPlayerInterface, intercation: Interaction, /, data: list[Playable],
-                 is_jump_command: bool = False, autoplay: bool = None, force_play: bool = False, put_front: bool = False, *, timeout: float | None = 180):
-        self.__data: list[Playable] = list(data)
-        self.__track_control: TrackPlayerInterface = control
-        self.__interaction: Interaction = intercation
+		self.__selected: Playable = None
+		self.__is_jump_command: bool = is_jump_command
+		self.__autoplay: bool = autoplay
+		self.__force_play: bool = force_play
+		self.__put_front: bool = put_front
 
-        self.__selected: Playable = None
-        self.__is_jump_command: bool = is_jump_command
-        self.__autoplay: bool = autoplay
-        self.__force_play: bool = force_play
-        self.__put_front: bool = put_front
+		self.__current_page: int = 1
 
-        self.__current_page: int = 1
+		self.__rand_emoji: list[str] = [
+			"🎼",
+			"🎵",
+			"🎶",
+			"🎸",
+			"🎷",
+			"🎺",
+			"🎹",
+			"🥁",
+			"🪕",
+			"🎻",
+		]
 
-        self.__rand_emoji: list[str] = [
-            "🎼", "🎵", "🎶", "🎸", "🎷", "🎺", "🎹", "🥁", "🪕", "🎻"]
+		if not self.__data:
+			raise IndexError
 
-        if not self.__data:
-            raise IndexError
+		super().__init__(timeout=timeout)
 
-        super().__init__(timeout=timeout)
+	@property
+	def get_embed(self) -> Embed:
+		data: list[Playable] = self.__get_current_page_data()
+		self.__update_buttons()
 
-    @property
-    def get_embed(self) -> Embed:
-        data: list[Playable] = self.__get_current_page_data()
-        self.__update_buttons()
+		total_pages: int = self.__max_pages()
+		self.__pass_data_to_option(data=data)
+		embed: Embed = Embed(
+			title=(
+				"🔍 Here's the result"
+				if not self.__is_jump_command
+				else "⏭️ Jump to which track?"
+			),
+			description="To play/queue the track, open the dropdown menu and select the desired track. Your track will be played/queued after this",
+			color=ModularUtil.convert_color(ModularBotConst.Color.WARNING),
+		)
 
-        total_pages: int = self.__max_pages()
-        self.__pass_data_to_option(data=data)
-        embed: Embed = Embed(title=("🔍 Here's the result" if not self.__is_jump_command else "⏭️ Jump to which track?"),
-                             description="To play/queue the track, open the dropdown menu and select the desired track. Your track will be played/queued after this",
-                             color=ModularUtil.convert_color(ModularBotConst.Color.WARNING))
+		if total_pages > 1:
+			embed.title += f" - Page {self.__current_page} of {total_pages}"
+		else:
+			self.__hide_paging()
 
-        if total_pages > 1:
-            embed.title += f" - Page {self.__current_page} of {total_pages}"
-        else:
-            self.__hide_paging()
+		return embed
 
-        return embed
+	def __get_current_page_data(self) -> list[Playable]:
+		start_index = 0
+		end_index = self.SHOW_LIMIT
 
-    def __get_current_page_data(self) -> list[Playable]:
-        start_index = 0
-        end_index = self.SHOW_LIMIT
+		if (
+			1
+			<= self.__current_page
+			<= (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
+		):
+			start_index = (self.__current_page - 1) * self.SHOW_LIMIT
+			end_index = start_index + self.SHOW_LIMIT
 
-        if 1 <= self.__current_page <= (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT:
-            start_index = (self.__current_page - 1) * self.SHOW_LIMIT
-            end_index = start_index + self.SHOW_LIMIT
+		return self.__data[start_index:end_index]
 
-        return self.__data[start_index:end_index]
+	def __pass_data_to_option(self, data: list[Playable]) -> None:
+		if self._selector.options:
+			self._selector.options.clear()
 
-    def __pass_data_to_option(self, data: list[Playable]) -> None:
-        if self._selector.options:
-            self._selector.options.clear()
+		index: int = (self.__current_page - 1) * self.SHOW_LIMIT
 
-        index: int = (self.__current_page-1) * self.SHOW_LIMIT
+		for track in data:
+			self._selector.append_option(
+				SelectOption(
+					label=ModularUtil.truncate_string(track.title, max=100),
+					description=f"{ModularUtil.truncate_string(track.author, max=50)}\
+                      - {UtilTrackPlayer.parse_sec(track.length)}",
+					emoji=choice(self.__rand_emoji),
+					value=str(index),
+				)
+			)
+			index += 1
 
-        for track in data:
-            self._selector.append_option(SelectOption(
-                label=ModularUtil.truncate_string(track.title, max=100), description=f"{ModularUtil.truncate_string(track.author, max=50)}\
-                      - {UtilTrackPlayer.parse_sec(track.length)}", emoji=choice(self.__rand_emoji), value=str(index)))
-            index += 1
+	def __max_pages(self) -> int:
+		max_pages = len(self.__data) // self.SHOW_LIMIT
+		if len(self.__data) % self.SHOW_LIMIT:
+			max_pages += 1
 
-    def __max_pages(self) -> int:
-        max_pages = len(self.__data) // self.SHOW_LIMIT
-        if len(self.__data) % self.SHOW_LIMIT:
-            max_pages += 1
+		return max_pages
 
-        return max_pages
+	def __hide_paging(self) -> None:
+		self._children = [
+			x for x in self.children if x in (self._selector, self._cancel_button)
+		]
 
-    def __hide_paging(self) -> None:
-        self._children = [x for x in self.children if x in (
-            self._selector, self._cancel_button)]
+	def __update_state_selected(self) -> None:
+		index: int = (self.__current_page - 1) * self.SHOW_LIMIT
 
-    def __update_state_selected(self) -> None:
-        index: int = (self.__current_page-1) * self.SHOW_LIMIT
+		self._prev_button.disabled = True
+		self._first_page_button.disabled = True
+		self._next_button.disabled = True
+		self._last_page_button.disabled = True
 
-        self._prev_button.disabled = True
-        self._first_page_button.disabled = True
-        self._next_button.disabled = True
-        self._last_page_button.disabled = True
+		self._selector.disabled = True
+		self._selector.placeholder = f"{
+			self._selector.options[int(self._selector.values[0]) - index].emoji
+		} {self._selector.options[int(self._selector.values[0]) - index].label}"
+		self._cancel_button.disabled = True
 
-        self._selector.disabled = True
-        self._selector.placeholder = f"{self._selector.options[int(self._selector.values[0]) - index].emoji} {
-            self._selector.options[int(self._selector.values[0]) - index].label}"
-        self._cancel_button.disabled = True
+	def __update_buttons(self):
+		if self.__current_page == 1:
+			self._prev_button.disabled = True
+			self._first_page_button.disabled = True
+		else:
+			self._prev_button.disabled = False
+			self._first_page_button.disabled = False
 
-    def __update_buttons(self):
-        if self.__current_page == 1:
-            self._prev_button.disabled = True
-            self._first_page_button.disabled = True
-        else:
-            self._prev_button.disabled = False
-            self._first_page_button.disabled = False
+		if (
+			self.__current_page
+			== (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
+		):
+			self._next_button.disabled = True
+			self._last_page_button.disabled = True
+		else:
+			self._next_button.disabled = False
+			self._last_page_button.disabled = False
 
-        if self.__current_page == (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT:
-            self._next_button.disabled = True
-            self._last_page_button.disabled = True
-        else:
-            self._next_button.disabled = False
-            self._last_page_button.disabled = False
+	async def __update_message(self, interaction: Interaction):
+		self.__update_buttons()
+		embed: Embed = self.get_embed
+		embed.timestamp = ModularUtil.get_time()
+		await interaction.edit_original_response(view=self, embed=embed)
 
-    async def __update_message(self, interaction: Interaction):
-        self.__update_buttons()
-        embed: Embed = self.get_embed
-        embed.timestamp = ModularUtil.get_time()
-        await interaction.edit_original_response(view=self, embed=embed)
+	async def interaction_check(self, interaction: Interaction) -> bool:
+		isTrue: bool = True
+		if interaction.user.id != self.__interaction.user.id:
+			await ModularUtil.send_response(
+				interaction,
+				message="Couldn't do that. \nThis is not your request!!",
+				emoji="🛑",
+				ephemeral=True,
+			)
+			isTrue = False
 
-    async def interaction_check(self, interaction: Interaction) -> bool:
-        isTrue: bool = True
-        if interaction.user.id != self.__interaction.user.id:
-            await ModularUtil.send_response(interaction, message="Couldn't do that. \nThis is not your request!!", emoji="🛑", ephemeral=True)
-            isTrue = False
+		return isTrue
 
-        return isTrue
+	async def on_timeout(self) -> None:
+		if not self.__selected:
+			await self.__interaction.delete_original_response()
+		return await super().on_timeout()
 
-    async def on_timeout(self) -> None:
-        if not self.__selected:
-            await self.__interaction.delete_original_response()
-        return await super().on_timeout()
+	@select(placeholder="🎶 Select your track!")
+	async def _selector(self, interaction: Interaction, select: Select) -> None:
+		self.__update_state_selected()
+		await wait([
+			create_task(interaction.edit_original_response(view=self)),
+			create_task(interaction.response.defer()),
+		])
+		player: CustomPlayer = interaction.guild.voice_client
 
-    @select(placeholder="🎶 Select your track!")
-    async def _selector(self, interaction: Interaction, select: Select) -> None:
-        self.__update_state_selected()
-        await wait([
-            create_task(interaction.edit_original_response(view=self)),
-            create_task(interaction.response.defer())
-        ])
-        player: CustomPlayer = interaction.guild.voice_client
+		self.__selected = self.__data[int(select.values[0])]
+		embed: Embed = await self.__track_control._play_response(
+			self.__interaction.user,
+			self.__selected,
+			is_queued=True if player and player.playing else False,
+			is_put_front=True
+			if self.__put_front or self.__force_play or self.__is_jump_command
+			else False,
+			is_autoplay=self.__autoplay,
+		)
 
-        self.__selected = self.__data[int(select.values[0])]
-        embed: Embed = await self.__track_control._play_response(
-            self.__interaction.user,
-            self.__selected,
-            is_queued=True if player and player.playing else False,
-            is_put_front=True if self.__put_front or self.__force_play or self.__is_jump_command else False,
-            is_autoplay=self.__autoplay
-        )
+		if not self.__is_jump_command:
+			_, _, _ = await self.__track_control.play(
+				interaction,
+				query=self.__selected,
+				autoplay=self.__autoplay,
+				force_play=self.__force_play,
+				put_front=self.__put_front,
+			)
+		else:
+			await self.__track_control.skip(
+				interaction, index=self.__data.index(self.__selected)
+			)
 
-        if not self.__is_jump_command:
-            _, _, _ = await self.__track_control.play(interaction, query=self.__selected, autoplay=self.__autoplay, force_play=self.__force_play, put_front=self.__put_front)
-        else:
-            await self.__track_control.skip(
-                interaction, index=self.__data.index(self.__selected))
+		await interaction.edit_original_response(view=None, embed=embed)
 
-        await interaction.edit_original_response(view=None, embed=embed)
+	@button(label="Cancel", emoji="✖️", style=ButtonStyle.red)
+	async def _cancel_button(self, interaction: Interaction, _) -> None:
+		await wait([
+			create_task(interaction.response.defer()),
+			create_task(interaction.delete_original_response()),
+		])
 
-    @button(label="Cancel", emoji="✖️", style=ButtonStyle.red)
-    async def _cancel_button(self, interaction: Interaction, _) -> None:
-        await wait([
-            create_task(interaction.response.defer()),
-            create_task(interaction.delete_original_response())
-        ])
+	@button(label="<<", style=ButtonStyle.secondary)
+	async def _first_page_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page = 1
+		await self.__update_message(interaction)
 
-    @button(label="<<", style=ButtonStyle.secondary)
-    async def _first_page_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page = 1
-        await self.__update_message(interaction)
+	@button(label="<", style=ButtonStyle.blurple)
+	async def _prev_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page -= 1
+		await self.__update_message(interaction)
 
-    @button(label="<", style=ButtonStyle.blurple)
-    async def _prev_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page -= 1
-        await self.__update_message(interaction)
+	@button(label=">", style=ButtonStyle.blurple)
+	async def _next_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page += 1
+		await self.__update_message(interaction)
 
-    @button(label=">", style=ButtonStyle.blurple)
-    async def _next_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page += 1
-        await self.__update_message(interaction)
-
-    @button(label=">>", style=ButtonStyle.secondary)
-    async def _last_page_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page = (
-            len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
-        await self.__update_message(interaction)
+	@button(label=">>", style=ButtonStyle.secondary)
+	async def _last_page_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page = (
+			len(self.__data) + self.SHOW_LIMIT - 1
+		) // self.SHOW_LIMIT
+		await self.__update_message(interaction)
 
 
 class QueueView(View):
+	SHOW_LIMIT: int = 10
 
-    SHOW_LIMIT: int = 10
+	def __init__(
+		self,
+		queue: chain | Queue,
+		interaction: Interaction,
+		is_history: bool = False,
+		*,
+		timeout: float | None = 180,
+	):
+		self.__data: list[Playable] = list(queue)
 
-    def __init__(self, queue: chain | Queue, interaction: Interaction, is_history: bool = False, *, timeout: float | None = 180):
-        self.__data: list[Playable] = list(queue)
+		self.__current_page: int = 1
+		self.__is_history: bool = is_history
+		self.__interaction: Interaction = interaction
 
-        self.__current_page: int = 1
-        self.__is_history: bool = is_history
-        self.__interaction: Interaction = interaction
+		if len(self.__data) == 0:
+			raise QueueEmpty()
 
-        if len(self.__data) == 0:
-            raise QueueEmpty()
+		super().__init__(timeout=timeout)
 
-        super().__init__(timeout=timeout)
+	@property
+	def get_embed(self) -> Embed:
+		data: list[Playable] = self.__get_current_page_data()
+		self.__update_buttons()
 
-    @property
-    def get_embed(self) -> Embed:
-        data: list[Playable] = self.__get_current_page_data()
-        self.__update_buttons()
+		total_pages: int = self.__max_pages()
+		embed: Embed = Embed(
+			title=f"📃 Queue {'history' if self.__is_history else ''} - Page {
+				self.__current_page
+			} of {total_pages}",
+			color=ModularUtil.convert_color(ModularBotConst.Color.WARNING),
+		)
+		count: int = (self.__current_page - 1) * self.SHOW_LIMIT
+		embed.description = str()
 
-        total_pages: int = self.__max_pages()
-        embed: Embed = Embed(
-            title=f"📃 Queue {
-                'history' if self.__is_history else ''} - Page {self.__current_page} of {total_pages}",
-            color=ModularUtil.convert_color(ModularBotConst.Color.WARNING))
-        count: int = (self.__current_page-1) * self.SHOW_LIMIT
-        embed.description = str()
+		for track in data:
+			count += 1
+			embed.description += f"{count}. **[{
+				ModularUtil.truncate_string(f'{track.title} | {track.author}')
+			}]({track.uri})** - {UtilTrackPlayer.parse_sec(track.length)}\n"
 
-        for track in data:
-            count += 1
-            embed.description += f"{count}. **[{ModularUtil.truncate_string(f'{track.title} | {track.author}')}]({
-                track.uri})** - {UtilTrackPlayer.parse_sec(track.length)}\n"
+		return embed
 
-        return embed
+	def __get_current_page_data(self) -> list[Playable]:
+		start_index = 0
+		end_index = self.SHOW_LIMIT
 
-    def __get_current_page_data(self) -> list[Playable]:
-        start_index = 0
-        end_index = self.SHOW_LIMIT
+		if (
+			1
+			<= self.__current_page
+			<= (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
+		):
+			start_index = (self.__current_page - 1) * self.SHOW_LIMIT
+			end_index = start_index + self.SHOW_LIMIT
 
-        if 1 <= self.__current_page <= (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT:
-            start_index = (self.__current_page - 1) * self.SHOW_LIMIT
-            end_index = start_index + self.SHOW_LIMIT
+		return self.__data[start_index:end_index]
 
-        return self.__data[start_index:end_index]
+	def __max_pages(self) -> int:
+		max_pages = len(self.__data) // self.SHOW_LIMIT
+		if len(self.__data) % self.SHOW_LIMIT:
+			max_pages += 1
 
-    def __max_pages(self) -> int:
-        max_pages = len(self.__data) // self.SHOW_LIMIT
-        if len(self.__data) % self.SHOW_LIMIT:
-            max_pages += 1
+		return max_pages
 
-        return max_pages
+	def __update_buttons(self):
+		if self.__current_page == 1:
+			self._prev_button.disabled = True
+			self._first_page_button.disabled = True
+		else:
+			self._prev_button.disabled = False
+			self._first_page_button.disabled = False
 
-    def __update_buttons(self):
-        if self.__current_page == 1:
-            self._prev_button.disabled = True
-            self._first_page_button.disabled = True
-        else:
-            self._prev_button.disabled = False
-            self._first_page_button.disabled = False
+		if (
+			self.__current_page
+			== (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
+		):
+			self._next_button.disabled = True
+			self._last_page_button.disabled = True
+		else:
+			self._next_button.disabled = False
+			self._last_page_button.disabled = False
 
-        if self.__current_page == (len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT:
-            self._next_button.disabled = True
-            self._last_page_button.disabled = True
-        else:
-            self._next_button.disabled = False
-            self._last_page_button.disabled = False
+	async def __update_message(self, interaction: Interaction):
+		self.__update_buttons()
+		embed: Embed = self.get_embed
+		embed.timestamp = interaction.created_at
+		await interaction.edit_original_response(view=self, embed=embed)
 
-    async def __update_message(self, interaction: Interaction):
-        self.__update_buttons()
-        embed: Embed = self.get_embed
-        embed.timestamp = interaction.created_at
-        await interaction.edit_original_response(view=self, embed=embed)
+	async def on_timeout(self) -> None:
+		await self.__interaction.delete_original_response()
+		return await super().on_timeout()
 
-    async def on_timeout(self) -> None:
-        await self.__interaction.delete_original_response()
-        return await super().on_timeout()
+	@button(label="<<", style=ButtonStyle.secondary)
+	async def _first_page_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page = 1
+		await self.__update_message(interaction)
 
-    @button(label="<<", style=ButtonStyle.secondary)
-    async def _first_page_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page = 1
-        await self.__update_message(interaction)
+	@button(label="<", style=ButtonStyle.blurple)
+	async def _prev_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page -= 1
+		await self.__update_message(interaction)
 
-    @button(label="<", style=ButtonStyle.blurple)
-    async def _prev_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page -= 1
-        await self.__update_message(interaction)
+	@button(label=">", style=ButtonStyle.blurple)
+	async def _next_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page += 1
+		await self.__update_message(interaction)
 
-    @button(label=">", style=ButtonStyle.blurple)
-    async def _next_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page += 1
-        await self.__update_message(interaction)
-
-    @button(label=">>", style=ButtonStyle.secondary)
-    async def _last_page_button(self, interaction: Interaction, _) -> None:
-        await interaction.response.defer()
-        self.__current_page = (
-            len(self.__data) + self.SHOW_LIMIT - 1) // self.SHOW_LIMIT
-        await self.__update_message(interaction)
+	@button(label=">>", style=ButtonStyle.secondary)
+	async def _last_page_button(self, interaction: Interaction, _) -> None:
+		await interaction.response.defer()
+		self.__current_page = (
+			len(self.__data) + self.SHOW_LIMIT - 1
+		) // self.SHOW_LIMIT
+		await self.__update_message(interaction)

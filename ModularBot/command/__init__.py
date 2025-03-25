@@ -9,10 +9,10 @@ from .playground import Playground
 
 
 async def setup(bot: commands.Bot) -> None:
-    await wait([
-        create_task(bot.add_cog(Administrator(bot))),
-        create_task(bot.add_cog(Multimedia(bot))),
-        create_task(bot.add_cog(Playground(bot)))
-    ])
+	await wait([
+		create_task(bot.add_cog(Administrator(bot))),
+		create_task(bot.add_cog(Multimedia(bot))),
+		create_task(bot.add_cog(Playground(bot))),
+	])
 
-    ModularUtil.simple_log("Cog loaded")
+	ModularUtil.simple_log("Cog loaded")
