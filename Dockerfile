@@ -2,6 +2,9 @@
 FROM python:3.12-alpine as builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# Compile bytecode & System Python
+ENV UV_COMPILE_BYTECODE=1 UV_SYSTEM_PYTHON=1
+
 # Define build argument
 ARG INSTALL_BUILD_TOOLS=false
 
@@ -19,25 +22,28 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv pip install --system --compile-bytecode --strict -r pyproject.toml
+    uv pip install --strict -r pyproject.toml
 
 # Copy the project into the intermediate image
 ADD . /app
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --compile-bytecode --strict -e .
+    uv pip install --strict -e .
 
 # Stage 2: Runtime stage
 FROM python:3.12-alpine
-
 WORKDIR /app
 
-# Copy the application from the builder
+# Create group and user "app"
+RUN addgroup -S app && adduser -S -G app app
+
+# Copy the application & necessary file from the builder
 COPY --from=builder --chown=app:app /usr/local /usr/local
-COPY --from=builder --chown=app:app /app .
+COPY --from=builder --chown=app:app /app/*.py .
+COPY --from=builder --chown=app:app /app/ModularBot ./ModularBot
 
-# Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
+# Switch to non-root user
+USER app
 
-CMD ["python", "bot.py"]
+CMD ["python3", "bot.py"]

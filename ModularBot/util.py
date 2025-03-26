@@ -1,7 +1,7 @@
 from datetime import datetime
 from os import path
 from io import BytesIO
-from logging import Logger, getLogger, INFO, StreamHandler
+from logging import ERROR, Logger, getLogger, INFO, StreamHandler
 
 from aiohttp import ClientSession
 from discord import (
@@ -60,7 +60,14 @@ class ModularUtil:
 	@staticmethod
 	def simple_log(message: str):
 		logger: Logger = getLogger(ModularBotConst.BOT_NAME)
+		logger.setLevel(INFO)
 		logger.info(message)
+
+	@staticmethod
+	def error_log(message: str):
+		logger: Logger = getLogger(ModularBotConst.BOT_NAME)
+		logger.setLevel(ERROR)
+		logger.error(message)
 
 	@staticmethod
 	async def send_response(

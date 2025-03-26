@@ -112,7 +112,8 @@ class Multimedia(commands.Cog, TrackPlayer):
 			)
 		except IndexError:
 			embed.description = "❌ Track not found, check your keyword or source"
-		except LavalinkLoadException:
+		except LavalinkLoadException as e:
+			ModularUtil.error_log(e)
 			embed.description = "💥 Something went wrong while loading track, try again"
 
 		await ModularUtil.send_response(interaction, embed=embed, view=view)
@@ -184,7 +185,8 @@ class Multimedia(commands.Cog, TrackPlayer):
 			)
 		except IndexError:
 			embed.description = "❌ Track not found, check your keyword or source"
-		except LavalinkLoadException:
+		except LavalinkLoadException as e:
+			ModularUtil.error_log(e)
 			embed.description = "💥 Something went wrong while loading track, try again"
 
 		await ModularUtil.send_response(interaction, embed=embed)
