@@ -53,15 +53,14 @@ class Prayers:
 
 					temp = temp.get("data")
 					time: datetime = ModularUtil.get_time()
-					cur_date: str = f"{time.strftime('%a')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')} {time.strftime('%b')}"
+					cur_date: str = f"{time.strftime('%a')} {time.strftime('%b')} {time.strftime('%d').replace('0', '') if time.strftime('%d').startswith('0') else time.strftime('%d')}"
 					res.update(dict(temp.get("praytimes")).get(cur_date, {}))
 					res.update({
 						"Maghrib": res.pop("Maghrib"),
 						"Subuh": res.pop("Fajr"),
-						"Dhuha": res.pop("Sunrise"),
-						"Dzuhur": res.pop("Dhuhr"),
+						"Dzuhur": res.pop("Zuhr"),
 						"Ashar": res.pop("Asr"),
-						"Isya": res.pop("Isha'a"),
+						"Isya": res.pop("Isha"),
 						"ramadhan": dict(temp.get("ramadhan")).get(
 							time.strftime("%Y"), {}
 						),
