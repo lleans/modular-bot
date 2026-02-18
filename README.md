@@ -23,7 +23,7 @@ Pak Yoyok Bot Source Code
 
 3. Install pre-commit. Pre-commit will automatically run checks before each commit:
    ```bash
-   pre-commit install
+   uv run pre-commit install
    ```
 
 ### Code Style and Linting ✨

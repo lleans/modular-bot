@@ -3,6 +3,7 @@ from io import BytesIO
 from random import choice
 from datetime import timedelta, datetime
 
+import discord
 from pytz import timezone
 
 from discord.ext import commands, tasks
@@ -71,11 +72,14 @@ class ModularBotTask:
 			overwrites = channel.overwrites_for(role)
 
 			if ramadhan_start.date() <= time.date() < ramadhan_end.date():
-				self._praytime_message = await self._praytime_channel.fetch_message(
-					self._praytime_channel.last_message_id
-				)
+				try:
+					self._praytime_message = await self._praytime_channel.fetch_message(
+						self._praytime_channel.last_message_id
+					)
+				except discord.NotFound:  # noqa: E722
+					pass
 
-				if (
+				if self._praytime_message is not None and (
 					time.date()
 					> self._praytime_message.created_at.astimezone(
 						timezone(ModularBotConst.TIMEZONE)
@@ -130,11 +134,11 @@ class ModularBotTask:
 
 	@tasks.loop(hours=1)
 	async def _pull_data(self) -> None:
-		try:
-			self._praytimes = await Prayers.get_prayertime(session=self.session)
-			await self.__ramadhan_checker()
-		except:  # noqa: E722
-			pass
+		# try:
+		self._praytimes = await Prayers.get_prayertime(session=self.session)
+		await self.__ramadhan_checker()
+		# except:  # noqa: E722
+		# 	pass
 
 	@tasks.loop(seconds=30)
 	async def _prayer_time(self) -> None:
@@ -397,6 +401,8 @@ class ModularBotClient(ModularBotBase, ModularBotTask):
 		self._praytime_channel: TextChannel = self.get_channel(
 			GuildChannel.PRAYER_CHANNEL
 		)
+
+		print(self._praytime_channel)
 
 		if not self.synced:
 			await self.tree.sync()
