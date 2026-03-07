@@ -15,7 +15,7 @@ dependencies = [
     "easy-pil>=0.4.0",
     "iso639-lang>=2.5.1",
     "pytz>=2024.2",
-    "wavelink>=3.4.1",
+    "wavelink",
 ]
 
 [dependency-groups]
@@ -39,3 +39,6 @@ target-version = "py312"
 [tool.ruff.format]
 indent-style = "tab"
 docstring-code-format = true
+
+[tool.uv.sources]
+wavelink = { git = "https://github.com/lleans/Wavelink", branch = "main" }
